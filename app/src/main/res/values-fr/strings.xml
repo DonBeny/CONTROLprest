@@ -40,4 +40,12 @@
     <string name="txt_close_tag">Puce programmée avec succés. Tapez pour fermer.</string>
     <string name="txt_wait_tag">Présentez votre puce à votre appareil</string>
     <string name="mess_timeout">Temps de réception des données dépassé</string>
+    <string name="un_message_a_t_envoy">Un message a été envoyé</string>
+    <string name="erreur_de_communication_avec_le_serveur">Erreur de communication avec le serveur</string>
+    <string name="erreur_lors_de_l_envoi_de_la_demande">Erreur lors de l\'envoi de la demande</string>
+    <string name="une_erreur_est_survenue_lors_de_l_initialisation">Une erreur est survenue lors de l\'initialisation</string>
+    <string name="veuillez_entrer_une_adresse_email">Veuillez entrer une adresse email</string>
+    <string name="veuillez_entrer_une_adresse_email_valide">Veuillez entrer une adresse email valide</string>
+    <string name="erreur_lors_du_traitement_de_la_r_ponse">Erreur lors du traitement de la réponse</string>
+    <string name="selectionner_une_entree">SELECTIONNER UNE ENTREE</string>
 </resources>

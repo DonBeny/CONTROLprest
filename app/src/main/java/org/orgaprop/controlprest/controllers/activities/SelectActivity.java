@@ -33,9 +33,13 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.Objects;
 import java.util.StringTokenizer;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 
 public class SelectActivity extends AppCompatActivity {
+
+    private static final String TAG = "SelectActivity";
 
 //********* PRIVATE VARIABLES
 
@@ -108,34 +112,44 @@ public class SelectActivity extends AppCompatActivity {
         grpSelected = "";
         rsdSelected = "";
 
-        assert mSearchInput != null;
-        mSearchInput.setOnEditorActionListener((textView, actionId, keyEvent) -> {
-            if (actionId == EditorInfo.IME_ACTION_SEARCH) {
-                startActivitySearch();
+        try {
+            if (mSearchInput != null) {
+                mSearchInput.setOnEditorActionListener((textView, actionId, keyEvent) -> {
+                    if (actionId == EditorInfo.IME_ACTION_SEARCH) {
+                        startActivitySearch();
 
-                InputMethodManager imm = (InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
+                        InputMethodManager imm = (InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
 
-                if (imm != null) {
-                    imm.hideSoftInputFromWindow(textView.getWindowToken(), 0);
-                    return true;
-                }
+                        if (imm != null) {
+                            imm.hideSoftInputFromWindow(textView.getWindowToken(), 0);
+                            return true;
+                        }
+                    }
+                    return false;
+                });
+                mSearchInput.setOnFocusChangeListener((v, hasFocus) -> {
+                    final InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
+                    if (imm != null) {
+                        imm.toggleSoftInput(InputMethodManager.SHOW_FORCED, 0);
+                    }
+                });
             }
-            return false;
-        });
-        mSearchInput.setOnFocusChangeListener((v, hasFocus) -> {
+
+            // Initialize UI and load data
+            chargAgcs();
+
             final InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
             if (imm != null) {
                 imm.toggleSoftInput(InputMethodManager.SHOW_FORCED, 0);
             }
-        });
-
-        chargAgcs();
-
-        final InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
-        if (imm != null) {
-            imm.toggleSoftInput(InputMethodManager.SHOW_FORCED, 0);
+        } catch (Exception e) {
+            Log.e(TAG, "Error in onCreate: " + e.getMessage(), e);
+            Toast.makeText(this, "Error initializing: " + e.getMessage(), Toast.LENGTH_LONG).show();
         }
     }
+
+//********* SURCHARGE
+
     @Override
     protected void onResume() {
         super.onResume();
@@ -148,402 +162,730 @@ public class SelectActivity extends AppCompatActivity {
         showWait(false);
     }
 
-//********* SURCHARGE
-
-
+    @Override
+    protected void onDestroy() {
+        try {
+            super.onDestroy();
+            // Clean up resources
+            idAgcs.clear();
+            idGrps.clear();
+            idRsds.clear();
+            nameAgcs.clear();
+            nameGrps.clear();
+            nameRsds.clear();
+            dataGrps.clear();
+        } catch (Exception e) {
+            Log.e(TAG, "Error in onDestroy: " + e.getMessage(), e);
+            Toast.makeText(this, "Error cleaning up: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+        }
+    }
 
 //********* PUBLIC FUNCTIONS
 
     public void selectActivityActions(View v) {
-        String viewTag = v.getTag().toString();
+        try {
+            if (v == null || v.getTag() == null) {
+                Log.e(TAG, "View or view tag is null");
+                Toast.makeText(this, "View or view tag is null", Toast.LENGTH_SHORT).show();
+                return;
+            }
 
-        switch (viewTag) {
-            case "search": startActivitySearch(); break;
-            case "go": startActivityStartCtrl(); break;
-            case "off": deconnectMbr(); break;
-            case "cancel": finishActivity(); break;
-            case "agc":
-            case "grp":
-            case "rsd":
-                typeSelect = viewTag;
-                startActivitySelect();
-                break;
+            String viewTag = v.getTag().toString();
+
+            switch (viewTag) {
+                case "search": startActivitySearch(); break;
+                case "go": startActivityStartCtrl(); break;
+                case "off": deconnectMbr(); break;
+                case "cancel": finishActivity(); break;
+                case "agc":
+                case "grp":
+                case "rsd":
+                    typeSelect = viewTag;
+                    startActivitySelect();
+                    break;
+                default:
+                    Log.w(TAG, "Unknown view tag: " + viewTag);
+                    Toast.makeText(this, "Unknown view tag: " + viewTag, Toast.LENGTH_SHORT).show();
+                    break;
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error in selectActivityActions: " + e.getMessage(), e);
+            Toast.makeText(this, "Error processing action: " + e.getMessage(), Toast.LENGTH_SHORT).show();
         }
     }
 
 //********* PRIVATE FUNCTIONS
 
     private void handleActivityResult(int resultCode, Intent data) {
-        TextView mSpinnerAgc = binding.selectActivityAgcSpinner;
-        TextView mSpinnerGrp = binding.selectActivityGrpSpinner;
-        TextView mSpinnerRsd = binding.selectActivityRsdSpinner;
+        try {
+            TextView mSpinnerAgc = binding.selectActivityAgcSpinner;
+            TextView mSpinnerGrp = binding.selectActivityGrpSpinner;
+            TextView mSpinnerRsd = binding.selectActivityRsdSpinner;
 
-        if( resultCode == RESULT_OK && data != null ) {
-            String typeResult = data.getStringExtra(SELECT_ACTIVITY_RESULT);
+            if (resultCode == RESULT_OK && data != null) {
+                String typeResult = data.getStringExtra(SELECT_ACTIVITY_RESULT);
 
-            if( Objects.equals(typeResult, SELECT_SEARCH_ACTIVITY_REQUEST) ) {
-                boolean b_grps = false;
-                boolean b_rsds = false;
+                if (Objects.equals(typeResult, SELECT_SEARCH_ACTIVITY_REQUEST)) {
+                    boolean b_grps = false;
+                    boolean b_rsds = false;
 
-                Log.e("SelectActivity", "handleActivityResult => search return");
+                    Log.d(TAG, "handleActivityResult => search return");
+                    Toast.makeText(this, "handleActivityResult => search return", Toast.LENGTH_SHORT).show();
 
-                agcSelected = data.getStringExtra(SearchActivity.SELECT_SEARCH_ACTIVITY_RESULT_AGC);
-                grpSelected = data.getStringExtra(SearchActivity.SELECT_SEARCH_ACTIVITY_RESULT_GRP);
-                rsdSelected = data.getStringExtra(SearchActivity.SELECT_SEARCH_ACTIVITY_RESULT_RSD);
+                    agcSelected = data.getStringExtra(SearchActivity.SELECT_SEARCH_ACTIVITY_RESULT_AGC);
+                    grpSelected = data.getStringExtra(SearchActivity.SELECT_SEARCH_ACTIVITY_RESULT_GRP);
+                    rsdSelected = data.getStringExtra(SearchActivity.SELECT_SEARCH_ACTIVITY_RESULT_RSD);
 
-                Log.e("SelectActivity", "handleActivityResult::agcSelected => "+agcSelected);
-                Log.e("SelectActivity", "handleActivityResult::grpSelected => "+grpSelected);
-                Log.e("SelectActivity", "handleActivityResult::rsdSelected => "+rsdSelected);
+                    Log.d(TAG, "handleActivityResult::agcSelected => " + agcSelected);
+                    Log.d(TAG, "handleActivityResult::grpSelected => " + grpSelected);
+                    Log.d(TAG, "handleActivityResult::rsdSelected => " + rsdSelected);
 
-                if( !agc.equals(idAgcs.indexOf(agcSelected)) ) {
-                    idGrps.clear();
-                    nameGrps.clear();
-                    dataGrps.clear();
-                    grp = -1;
-                    nbGrps = 0;
-                    b_grps = true;
-                }
-                if( !grp.equals(idGrps.indexOf(grpSelected)) ) {
-                    idRsds.clear();
-                    nameRsds.clear();
-                    rsd = -1;
-                    nbRsds = 0;
-                    b_rsds = true;
-                }
+                    // Check for null or invalid indices to prevent ArrayIndexOutOfBoundsException
+                    if (agcSelected != null && !agcSelected.isEmpty()) {
+                        int newAgc = idAgcs.indexOf(agcSelected);
 
-                if( agcSelected != null && !agcSelected.isEmpty() ) {
-                    agc = idAgcs.indexOf(agcSelected);
-                    mSpinnerAgc.setText(nameAgcs.get(agc));
+                        if (newAgc >= 0 && newAgc < nameAgcs.size()) {
+                            if (!agc.equals(newAgc)) {
+                                idGrps.clear();
+                                nameGrps.clear();
+                                dataGrps.clear();
+                                grp = -1;
+                                nbGrps = 0;
+                                b_grps = true;
+                            }
 
-                    if (b_grps) {
-                        chargGrps();
-                    } else if (b_rsds) {
-                        grp = idGrps.indexOf(grpSelected);
-                        mSpinnerGrp.setText(nameGrps.get(grp));
-                        makeRsds();
+                            agc = newAgc;
+                            mSpinnerAgc.setText(nameAgcs.get(agc));
+
+                            if (grpSelected != null && !grpSelected.isEmpty()) {
+                                int newGrp = idGrps.indexOf(grpSelected);
+
+                                if (b_grps) {
+                                    chargGrps();
+                                } else if (!grp.equals(newGrp)) {
+                                    idRsds.clear();
+                                    nameRsds.clear();
+                                    rsd = -1;
+                                    nbRsds = 0;
+                                    b_rsds = true;
+
+                                    if (newGrp >= 0 && newGrp < nameGrps.size()) {
+                                        grp = newGrp;
+                                        mSpinnerGrp.setText(nameGrps.get(grp));
+                                        makeRsds();
+                                    }
+                                }
+                            }
+                        } else {
+                            Log.e(TAG, "Invalid agency index: " + newAgc);
+                            Toast.makeText(this, "Error: Invalid agency selection", Toast.LENGTH_SHORT).show();
+                        }
+                    }
+                } else if (Objects.equals(typeResult, MAKE_SELECT_ACTIVITY_REQUEST)) {
+                    int selectType = data.getIntExtra(MAKE_SELECT_ACTIVITY_TYPE, 0);
+
+                    if (selectType == MakeSelectActivity.MAKE_SELECT_ACTIVITY_AGC) {
+                        agcSelected = data.getStringExtra(MAKE_SELECT_ACTIVITY_RESULT);
+
+                        if (agcSelected != null && !agcSelected.isEmpty()) {
+                            int newAgc = idAgcs.indexOf(agcSelected);
+
+                            if (newAgc >= 0 && newAgc < nameAgcs.size()) {
+                                agc = newAgc;
+
+                                idGrps.clear();
+                                nameGrps.clear();
+                                dataGrps.clear();
+                                grp = -1;
+                                grpSelected = "";
+                                nbGrps = 0;
+
+                                idRsds.clear();
+                                nameRsds.clear();
+                                rsd = -1;
+                                rsdSelected = "";
+                                nbRsds = 0;
+
+                                runOnUiThread(() -> mSpinnerAgc.setText(nameAgcs.get(agc)));
+                                chargGrps();
+                            } else {
+                                Log.e(TAG, "Invalid agency index: " + newAgc);
+                                Toast.makeText(this, "Error: Invalid agency selection", Toast.LENGTH_SHORT).show();
+                            }
+                        }
+                    } else if (selectType == MakeSelectActivity.MAKE_SELECT_ACTIVITY_GRP) {
+                        grpSelected = data.getStringExtra(MAKE_SELECT_ACTIVITY_RESULT);
+
+                        if (grpSelected != null && !grpSelected.isEmpty()) {
+                            int newGrp = idGrps.indexOf(grpSelected);
+
+                            if (newGrp >= 0 && newGrp < nameGrps.size() && !grp.equals(newGrp)) {
+                                grp = newGrp;
+
+                                idRsds.clear();
+                                nameRsds.clear();
+
+                                rsd = -1;
+                                rsdSelected = "";
+                                nbRsds = 0;
+
+                                runOnUiThread(() -> mSpinnerGrp.setText(nameGrps.get(grp)));
+                                makeRsds();
+                            } else if (newGrp < 0 || newGrp >= nameGrps.size()) {
+                                Log.e(TAG, "Invalid group index: " + newGrp);
+                                Toast.makeText(this, "Error: Invalid group selection", Toast.LENGTH_SHORT).show();
+                            }
+                        }
+                    } else if (selectType == MakeSelectActivity.MAKE_SELECT_ACTIVITY_RSD) {
+                        rsdSelected = data.getStringExtra(MAKE_SELECT_ACTIVITY_RESULT);
+
+                        if (rsdSelected != null && !rsdSelected.isEmpty()) {
+                            int newRsd = idRsds.indexOf(rsdSelected);
+
+                            if (newRsd >= 0 && newRsd < nameRsds.size()) {
+                                rsd = newRsd;
+
+                                final String residenceName = nameRsds.get(rsd).getName() + " " + nameRsds.get(rsd).getAdress();
+                                runOnUiThread(() -> mSpinnerRsd.setText(residenceName));
+                            } else {
+                                Log.e(TAG, "Invalid residence index: " + newRsd);
+                                Toast.makeText(this, "Error: Invalid residence selection", Toast.LENGTH_SHORT).show();
+                            }
+                        }
                     }
                 }
             }
-            if( Objects.equals(typeResult, MAKE_SELECT_ACTIVITY_REQUEST) ) {
-                if( data.getIntExtra(MAKE_SELECT_ACTIVITY_TYPE, 0) == MakeSelectActivity.MAKE_SELECT_ACTIVITY_AGC ) {
-                    agcSelected = data.getStringExtra(MAKE_SELECT_ACTIVITY_RESULT);
-
-                    if( agcSelected != null && !agcSelected.isEmpty() ) {
-                        agc = idAgcs.indexOf(agcSelected);
-
-                        idGrps.clear();
-                        nameGrps.clear();
-                        dataGrps.clear();
-                        grp = -1;
-                        grpSelected = "";
-                        nbGrps = 0;
-
-                        idRsds.clear();
-                        nameRsds.clear();
-                        rsd = -1;
-                        rsdSelected = "";
-                        nbRsds = 0;
-
-                        runOnUiThread(() -> mSpinnerAgc.setText(nameAgcs.get(agc)));
-                        chargGrps();
-                    }
-                }
-                if( data.getIntExtra(MAKE_SELECT_ACTIVITY_TYPE, 0) == MakeSelectActivity.MAKE_SELECT_ACTIVITY_GRP ) {
-                    grpSelected = data.getStringExtra(MAKE_SELECT_ACTIVITY_RESULT);
-
-                    if( grpSelected != null && !grpSelected.isEmpty() && !grp.equals(idGrps.indexOf(grpSelected)) ) {
-                        grp = idGrps.indexOf(grpSelected);
-
-                        idRsds.clear();
-                        nameRsds.clear();
-
-                        rsd = -1;
-                        rsdSelected = "";
-                        nbRsds = 0;
-
-                        runOnUiThread(() -> mSpinnerGrp.setText(nameGrps.get(grp)));
-                        makeRsds();
-                    }
-                }
-                if( data.getIntExtra(MAKE_SELECT_ACTIVITY_TYPE, 0) == MakeSelectActivity.MAKE_SELECT_ACTIVITY_RSD ) {
-                    rsdSelected = data.getStringExtra(MAKE_SELECT_ACTIVITY_RESULT);
-
-                    if( rsdSelected != null && !rsdSelected.isEmpty() ) {
-                        rsd = idRsds.indexOf(rsdSelected);
-
-                        String m = nameRsds.get(rsd).getName() + " " + nameRsds.get(rsd).getAdress();
-                        runOnUiThread(() -> mSpinnerRsd.setText(m));
-                    }
-                }
-            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error in handleActivityResult: " + e.getMessage(), e);
+            Toast.makeText(this, "Error processing result: " + e.getMessage(), Toast.LENGTH_SHORT).show();
         }
     }
 
     private void startActivitySearch() {
-        EditText mSearchInput = binding.selectActivitySearchInput;
+        try {
+            EditText mSearchInput = binding.selectActivitySearchInput;
 
-        assert mSearchInput != null;
-        if( !mSearchInput.getText().toString().isEmpty() && !waitDownload ) {
-            Intent intent = new Intent(SelectActivity.this, SearchActivity.class);
+            if (mSearchInput == null) {
+                Log.e(TAG, "Search input is null");
+                Toast.makeText(this, "Search input is null", Toast.LENGTH_SHORT).show();
+                return;
+            }
 
-            canCheck = false;
+            String searchText = mSearchInput.getText().toString().trim();
+            if (!searchText.isEmpty() && !waitDownload) {
+                Intent intent = new Intent(SelectActivity.this, SearchActivity.class);
+
+                canCheck = false;
+                showWait(true);
+
+                intent.putExtra(SearchActivity.SELECT_SEARCH_ACTIVITY_STR, searchText);
+
+                makeSelectActivityLauncher.launch(intent);
+            } else if (searchText.isEmpty()) {
+                Toast.makeText(this, "Please enter a search term", Toast.LENGTH_SHORT).show();
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error in startActivitySearch: " + e.getMessage(), e);
+            Toast.makeText(this, "Error starting search: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+            showWait(false);
+        }
+    }
+
+    private void startActivitySelect() {
+        try {
+            switch (typeSelect) {
+                case "agc":
+                    if (!waitDownload && nbAgcs > 0) {
+                        showWait(true);
+                        canCheck = false;
+
+                        Intent intent = new Intent(SelectActivity.this, MakeSelectActivity.class);
+                        intent.putExtra(MAKE_SELECT_ACTIVITY_TYPE, MakeSelectActivity.MAKE_SELECT_ACTIVITY_AGC);
+
+                        makeSelectActivityLauncher.launch(intent);
+                    } else {
+                        Log.e(TAG, "No agencies available");
+                        Toast.makeText(this, "No agencies available", Toast.LENGTH_SHORT).show();
+                    }
+                    break;
+                case "grp":
+                    if (!waitDownload && agc >= 0 && nbGrps > 0) {
+                        showWait(true);
+                        canCheck = false;
+
+                        Intent intent = new Intent(SelectActivity.this, MakeSelectActivity.class);
+                        intent.putExtra(MAKE_SELECT_ACTIVITY_TYPE, MakeSelectActivity.MAKE_SELECT_ACTIVITY_GRP);
+
+                        makeSelectActivityLauncher.launch(intent);
+                    } else {
+                        if (agc < 0) {
+                            Log.e(TAG, "Please select an agency first");
+                            Toast.makeText(this, "Please select an agency first", Toast.LENGTH_SHORT).show();
+                        } else if (nbGrps <= 0) {
+                            Log.e(TAG, "No groups available");
+                            Toast.makeText(this, "No groups available", Toast.LENGTH_SHORT).show();
+                        }
+                    }
+                    break;
+                case "rsd":
+                    if (!waitDownload && grp >= 0 && nbRsds > 0) {
+                        showWait(true);
+                        canCheck = false;
+
+                        Intent intent = new Intent(SelectActivity.this, MakeSelectActivity.class);
+                        intent.putExtra(MAKE_SELECT_ACTIVITY_TYPE, MakeSelectActivity.MAKE_SELECT_ACTIVITY_RSD);
+
+                        makeSelectActivityLauncher.launch(intent);
+                    } else {
+                        if (agc < 0) {
+                            Log.e(TAG, "Please select an agency first");
+                            Toast.makeText(this, "Please select an agency first", Toast.LENGTH_SHORT).show();
+                        } else if (grp < 0) {
+                            Log.e(TAG, "Please select a group first");
+                            Toast.makeText(this, "Please select a group first", Toast.LENGTH_SHORT).show();
+                        } else if (nbRsds <= 0) {
+                            Log.e(TAG, "No residences available");
+                            Toast.makeText(this, "No residences available", Toast.LENGTH_SHORT).show();
+                        }
+                    }
+                    break;
+                default:
+                    Log.w(TAG, "Unknown type select: " + typeSelect);
+                    Toast.makeText(this, "Unknown type select: " + typeSelect, Toast.LENGTH_SHORT).show();
+                    break;
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error in startActivitySelect: " + e.getMessage(), e);
+            Toast.makeText(this, "Error starting selection: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+            showWait(false);
+        }
+    }
+
+    private void startActivityStartCtrl() {
+        try {
+            if (!waitDownload && !isStarted && rsd >= 0) {
+                isStarted = true;
+                canCheck = false;
+
+                prefs.setAgency(agcSelected);
+                prefs.setGroup(grpSelected);
+                prefs.setResidence(rsdSelected);
+
+                Intent intent = new Intent(SelectActivity.this, NfsActivity.class);
+                intent.putExtra(SELECT_ACTIVITY_RSD, rsdSelected);
+
+                startActivity(intent);
+            } else if (rsd < 0) {
+                Log.e(TAG, "Please select a residence first");
+                Toast.makeText(this, "Please select a residence first", Toast.LENGTH_SHORT).show();
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error in startActivityStartCtrl: " + e.getMessage(), e);
+            Toast.makeText(this, "Error starting control: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private void deconnectMbr() {
+        try {
             showWait(true);
 
-            intent.putExtra(SearchActivity.SELECT_SEARCH_ACTIVITY_STR, mSearchInput.getText().toString().trim());
+            HttpTask task = new HttpTask(SelectActivity.this);
+            CompletableFuture<String> futureResult = task.executeHttpTask(
+                    HttpTask.HTTP_TASK_ACT_CONEX,
+                    HttpTask.HTTP_TASK_CBL_NO,
+                    "",
+                    "mbr=" + LoginActivity.idMbr
+            );
 
-            makeSelectActivityLauncher.launch(intent);
-        }
-    }
-    private void startActivitySelect() {
-        switch( typeSelect ) {
-            case "agc":
-                if( !waitDownload && nbAgcs > 0 ) {
-                    showWait(true);
-                    canCheck = false;
+            futureResult.thenAccept(result -> {
+                if (result.startsWith("1")) {
+                    prefs.setMbr("new");
+                    prefs.setAgency("");
+                    prefs.setGroup("");
+                    prefs.setResidence("");
 
-                    Intent intent = new Intent(SelectActivity.this, MakeSelectActivity.class);
-                    intent.putExtra(MAKE_SELECT_ACTIVITY_TYPE, MakeSelectActivity.MAKE_SELECT_ACTIVITY_AGC);
-
-                    makeSelectActivityLauncher.launch(intent);
-                }
-                break;
-            case "grp":
-                if( !waitDownload && agc >= 0 && nbGrps > 0 ) {
-                    showWait(true);
-                    canCheck = false;
-
-                    Intent intent = new Intent(SelectActivity.this, MakeSelectActivity.class);
-                    intent.putExtra(MAKE_SELECT_ACTIVITY_TYPE, MakeSelectActivity.MAKE_SELECT_ACTIVITY_GRP);
-
-                    makeSelectActivityLauncher.launch(intent);
-                } else {
-                    if( agc < 0 ) {
-                        Toast.makeText(SelectActivity.this, "Choisissez un agence", Toast.LENGTH_LONG).show();
+                    try {
+                        LoginActivity loginActivity = LoginActivity.getInstance();
+                        if (loginActivity != null) {
+                            loginActivity.finish();
+                        }
+                    } catch (Exception e) {
+                        Log.e(TAG, "Error finishing LoginActivity: " + e.getMessage(), e);
+                        runOnUiThread(() ->
+                            Toast.makeText(SelectActivity.this, "Error finishing LoginActivity: " + e.getMessage(), Toast.LENGTH_SHORT).show()
+                        );
                     }
-                }
-                break;
-            case "rsd":
-                if( !waitDownload && grp >= 0 && nbRsds > 0 ) {
-                    showWait(true);
-                    canCheck = false;
 
-                    Intent intent = new Intent(SelectActivity.this, MakeSelectActivity.class);
-                    intent.putExtra(MAKE_SELECT_ACTIVITY_TYPE, MakeSelectActivity.MAKE_SELECT_ACTIVITY_RSD);
-
-                    makeSelectActivityLauncher.launch(intent);
+                    finish();
                 } else {
-                    if( agc < 0 ) {
-                        Toast.makeText(SelectActivity.this, "Choisissez un agence", Toast.LENGTH_LONG).show();
-                    } else if( grp < 0 ) {
-                        Toast.makeText(SelectActivity.this, "Choisissez un groupement", Toast.LENGTH_LONG).show();
+                    showWait(false);
+
+                    Log.e(TAG, "Error in deconnectMbr: " + result.substring(1));
+                    runOnUiThread(() ->
+                        Toast.makeText(SelectActivity.this, result.substring(1), Toast.LENGTH_SHORT).show()
+                    );
+
+                    try {
+                        LoginActivity loginActivity = LoginActivity.getInstance();
+                        if (loginActivity != null) {
+                            loginActivity.finish();
+                        }
+                    } catch (Exception e) {
+                        Log.e(TAG, "Error finishing LoginActivity: " + e.getMessage(), e);
+                        runOnUiThread(() ->
+                            Toast.makeText(SelectActivity.this, "Error finishing LoginActivity: " + e.getMessage(), Toast.LENGTH_SHORT).show()
+                        );
                     }
+
+                    finish();
                 }
-                break;
+            }).exceptionally(ex -> {
+                showWait(false);
+                String errorMessage = ex instanceof CancellationException ?
+                        "Request cancelled" :
+                        "Network connection error";
+
+                Log.e(TAG, "Error in deconnectMbr: " + ex.getMessage(), ex);
+                runOnUiThread(() -> Toast.makeText(SelectActivity.this,
+                    errorMessage, Toast.LENGTH_SHORT).show());
+
+                try {
+                    LoginActivity loginActivity = LoginActivity.getInstance();
+                    if (loginActivity != null) {
+                        loginActivity.finish();
+                    }
+                } catch (Exception e) {
+                    Log.e(TAG, "Error finishing LoginActivity: " + e.getMessage(), e);
+                    runOnUiThread(() ->
+                        Toast.makeText(SelectActivity.this, "Error finishing LoginActivity: " + e.getMessage(), Toast.LENGTH_SHORT).show()
+                    );
+                }
+
+                finish();
+                return null;
+            });
+        } catch (Exception e) {
+            Log.e(TAG, "Error in deconnectMbr: " + e.getMessage(), e);
+            Toast.makeText(this, "Disconnection error: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+            showWait(false);
         }
     }
-    private void startActivityStartCtrl() {
-        if( !waitDownload && !isStarted && rsd >= 0 ) {
-            isStarted = true;
-            canCheck = false;
 
-            prefs.setAgency(agcSelected);
-            prefs.setGroup(grpSelected);
-            prefs.setResidence(rsdSelected);
-
-            Intent intent = new Intent(SelectActivity.this, NfsActivity.class);
-
-            intent.putExtra(SELECT_ACTIVITY_RSD, rsdSelected);
-
-            startActivity(intent);
-        }
-    }
-    private void deconnectMbr() {
-        HttpTask task = new HttpTask(SelectActivity.this);
-        CompletableFuture<String> futureResult = task.executeHttpTask(HttpTask.HTTP_TASK_ACT_CONEX, HttpTask.HTTP_TASK_CBL_NO, "", "mbr="+LoginActivity.idMbr);
-
-        futureResult.thenAccept(result -> {
-            if( result.startsWith("1") ) {
-                prefs.setMbr("new");
-                prefs.setAgency("");
-                prefs.setGroup("");
-                prefs.setResidence("");
-
-                LoginActivity.getInstance().finish();
-                finish();
-            } else {
-                Toast.makeText(SelectActivity.this, result.substring(1), Toast.LENGTH_SHORT).show();
-
-                LoginActivity.getInstance().finish();
-                finish();
-            }
-        }).exceptionally(ex -> {
-            Toast.makeText(SelectActivity.this, getResources().getString(R.string.mess_timeout), Toast.LENGTH_SHORT).show();
-
-            LoginActivity.getInstance().finish();
-            finish();
-
-            return null;
-        });
-    }
     private void finishActivity() {
         runOnUiThread(this::finish);
     }
 
     private void chargAgcs() {
-        TextView mSpinnerAgc = binding.selectActivityAgcSpinner;
-        TextView mSpinnerGrp = binding.selectActivityGrpSpinner;
-        TextView mSpinnerRsd = binding.selectActivityRsdSpinner;
+        try {
+            TextView mSpinnerAgc = binding.selectActivityAgcSpinner;
+            TextView mSpinnerGrp = binding.selectActivityGrpSpinner;
+            TextView mSpinnerRsd = binding.selectActivityRsdSpinner;
 
-        Intent intent = getIntent();
-        StringTokenizer tokenizer = new StringTokenizer(intent.getStringExtra(SELECT_ACTIVITY_EXTRA), "§");
-        String m = "Sélectionner une agence";
+            Intent intent = getIntent();
+            String agenciesData = intent.getStringExtra(SELECT_ACTIVITY_EXTRA);
 
-        waitDownload = true;
-
-        idAgcs.clear();
-        nameAgcs.clear();
-
-        mSpinnerGrp.setText(m);
-        mSpinnerRsd.setText(m);
-
-        if( tokenizer.countTokens() > 1 ) {
-            while( tokenizer.hasMoreTokens() ) {
-                String item = tokenizer.nextToken();
-
-                idAgcs.add(item.substring(0, item.indexOf("£")));
-                nameAgcs.add(item.substring(item.indexOf("£") + 1));
-                nbAgcs++;
+            if (agenciesData == null || agenciesData.isEmpty()) {
+                Log.e(TAG, "Agencies data is null or empty");
+                Toast.makeText(this, "No agencies data available", Toast.LENGTH_SHORT).show();
+                return;
             }
-        } else {
-            String item = tokenizer.nextToken();
 
-            idAgcs.add(item.substring(0, item.indexOf("£")));
-            nameAgcs.add(item.substring(item.indexOf("£") + 1));
-            agcSelected = idAgcs.get(0);
-        }
+            StringTokenizer tokenizer = new StringTokenizer(agenciesData, "§");
+            String defaultMessage = "Select an agency";
 
-        if( !agcSelected.isEmpty() ) {
-            agc = idAgcs.indexOf(agcSelected);
-            m = nameAgcs.get(agc);
-            chargGrps();
-        }
+            waitDownload = true;
 
-        mSpinnerAgc.setText(m);
+            idAgcs.clear();
+            nameAgcs.clear();
+            nbAgcs = 0;
 
-        waitDownload = false;
-    }
-    private void chargGrps() {
-        TextView mSpinnerGrp = binding.selectActivityGrpSpinner;
-        pl.droidsonroids.gif.GifImageView mWaitGrpImg = binding.selectActivityWaitGrpImg;
+            mSpinnerGrp.setText(defaultMessage);
+            mSpinnerRsd.setText(defaultMessage);
 
-        waitDownload = true;
+            if (tokenizer.countTokens() > 1) {
+                while (tokenizer.hasMoreTokens()) {
+                    String item = tokenizer.nextToken();
+                    int separatorIndex = item.indexOf("£");
 
-        mWaitGrpImg.setVisibility(View.VISIBLE);
-
-        HttpTask task = new HttpTask(SelectActivity.this);
-        CompletableFuture<String> futureResult = task.executeHttpTask(HttpTask.HTTP_TASK_ACT_LIST, HttpTask.HTTP_TASK_CBL_GRPS, "val="+agcSelected, "mbr="+LoginActivity.idMbr);
-
-        futureResult.thenAccept(result -> {
-            if( result.startsWith("1") ) {
-                String mess = "Sélectionner un groupement";
-
-                try {
-                    JSONObject obj = new JSONObject(result.substring(1));
-
-                    if (obj.has("grps")) {
-                        Iterator<String> keys_grps = obj.getJSONObject("grps").keys();
-
-                        while (keys_grps.hasNext()) {
-                            String kg = keys_grps.next();
-                            JSONObject obj_grp = obj.getJSONObject("grps").getJSONObject(kg);
-
-                            idGrps.add(obj_grp.getString("id"));
-                            nameGrps.add(obj_grp.getString("name"));
-                            dataGrps.add(obj_grp.getJSONObject("rsds"));
-
-                            nbGrps++;
-                        }
+                    if (separatorIndex > 0 && separatorIndex < item.length() - 1) {
+                        idAgcs.add(item.substring(0, separatorIndex));
+                        nameAgcs.add(item.substring(separatorIndex + 1));
+                        nbAgcs++;
+                    } else {
+                        Log.w(TAG, "Invalid agency format: " + item);
+                        Toast.makeText(this, "Invalid agency format: " + item, Toast.LENGTH_SHORT).show();
                     }
-                } catch (JSONException e) {
-                    e.printStackTrace();
                 }
+            } else if (tokenizer.countTokens() == 1) {
+                String item = tokenizer.nextToken();
+                int separatorIndex = item.indexOf("£");
 
-                if( !grpSelected.isEmpty() && idGrps.contains(grpSelected) ) {
-                    grp = idGrps.indexOf(grpSelected);
-                    mess = nameGrps.get(grp);
-
-                    makeRsds();
+                if (separatorIndex > 0 && separatorIndex < item.length() - 1) {
+                    idAgcs.add(item.substring(0, separatorIndex));
+                    nameAgcs.add(item.substring(separatorIndex + 1));
+                    agcSelected = idAgcs.get(0);
+                    nbAgcs = 1;
+                } else {
+                    Log.w(TAG, "Invalid agency format: " + item);
+                    Toast.makeText(this, "Invalid agency format: " + item, Toast.LENGTH_SHORT).show();
                 }
-
-                String finalMess = mess;
-                SelectActivity.this.runOnUiThread(() -> mSpinnerGrp.setText(finalMess));
-            } else {
-                Toast.makeText(SelectActivity.this, result.substring(1), Toast.LENGTH_SHORT).show();
             }
-        }).exceptionally(ex -> {
-            Toast.makeText(SelectActivity.this, getResources().getString(R.string.mess_timeout), Toast.LENGTH_SHORT).show();
 
-            return null;
-        });
+            String displayMessage = defaultMessage;
+            if (!agcSelected.isEmpty()) {
+                agc = idAgcs.indexOf(agcSelected);
+                if (agc >= 0 && agc < nameAgcs.size()) {
+                    displayMessage = nameAgcs.get(agc);
+                    chargGrps();
+                }
+            }
 
-        SelectActivity.this.runOnUiThread(() -> {
-            mWaitGrpImg.setVisibility(View.INVISIBLE);
-        });
+            final String finalMessage = displayMessage;
+            mSpinnerAgc.setText(finalMessage);
 
-        waitDownload = false;
+            waitDownload = false;
+        } catch (Exception e) {
+            Log.e(TAG, "Error in chargAgcs: " + e.getMessage(), e);
+            Toast.makeText(this, "Error loading agencies: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+            waitDownload = false;
+        }
     }
+
+    private void chargGrps() {
+        try {
+            TextView mSpinnerGrp = binding.selectActivityGrpSpinner;
+            pl.droidsonroids.gif.GifImageView mWaitGrpImg = binding.selectActivityWaitGrpImg;
+
+            waitDownload = true;
+            idGrps.clear();
+            nameGrps.clear();
+            dataGrps.clear();
+            nbGrps = 0;
+
+            mWaitGrpImg.setVisibility(View.VISIBLE);
+
+            HttpTask task = new HttpTask(SelectActivity.this);
+            CompletableFuture<String> futureResult = task.executeHttpTask(
+                    HttpTask.HTTP_TASK_ACT_LIST,
+                    HttpTask.HTTP_TASK_CBL_GRPS,
+                    "val=" + agcSelected,
+                    "mbr=" + LoginActivity.idMbr
+            );
+
+            futureResult.thenAccept(result -> {
+                try {
+                    String displayMessage = "Select a group";
+
+                    if (result.startsWith("1")) {
+                        try {
+                            String jsonData = result.substring(1);
+                            if (jsonData.isEmpty()) {
+                                Log.w(TAG, "Empty JSON data received");
+                                runOnUiThread(() -> Toast.makeText(SelectActivity.this,
+                                        "No group data received", Toast.LENGTH_SHORT).show());
+                                return;
+                            }
+
+                            JSONObject obj = new JSONObject(jsonData);
+
+                            if (obj.has("grps")) {
+                                JSONObject grpsObj = obj.getJSONObject("grps");
+                                Iterator<String> keys_grps = grpsObj.keys();
+
+                                while (keys_grps.hasNext()) {
+                                    String kg = keys_grps.next();
+                                    JSONObject obj_grp = grpsObj.getJSONObject(kg);
+
+                                    idGrps.add(obj_grp.getString("id"));
+                                    nameGrps.add(obj_grp.getString("name"));
+                                    dataGrps.add(obj_grp.getJSONObject("rsds"));
+
+                                    nbGrps++;
+                                }
+                            } else {
+                                Log.w(TAG, "No 'grps' key in JSON data");
+                                runOnUiThread(() -> Toast.makeText(SelectActivity.this,
+                                        "No 'grps' key in JSON data", Toast.LENGTH_SHORT).show());
+                                return;
+                            }
+
+                            if (!grpSelected.isEmpty() && idGrps.contains(grpSelected)) {
+                                grp = idGrps.indexOf(grpSelected);
+                                if (grp >= 0 && grp < nameGrps.size()) {
+                                    displayMessage = nameGrps.get(grp);
+                                    makeRsds();
+                                }
+                            }
+                        } catch (JSONException e) {
+                            Log.e(TAG, "JSON parsing error: " + e.getMessage(), e);
+                            runOnUiThread(() -> Toast.makeText(SelectActivity.this,
+                                    "Error parsing groups data: " + e.getMessage(), Toast.LENGTH_SHORT).show());
+                        }
+                    } else {
+                        final String errorMessage = result.substring(1);
+                        Log.e(TAG, "Error in chargGrps: " + errorMessage);
+                        runOnUiThread(() -> Toast.makeText(SelectActivity.this,
+                                errorMessage, Toast.LENGTH_SHORT).show());
+                    }
+
+                    final String finalMessage = displayMessage;
+                    runOnUiThread(() -> mSpinnerGrp.setText(finalMessage));
+                } finally {
+                    runOnUiThread(() -> {
+                        mWaitGrpImg.setVisibility(View.INVISIBLE);
+                        waitDownload = false;
+                    });
+                }
+            }).exceptionally(ex -> {
+                Log.e(TAG, "Error in chargGrps: " + (ex instanceof ExecutionException ?
+                        Objects.requireNonNull(ex.getCause()).getMessage() : ex.getMessage()), ex);
+
+                runOnUiThread(() -> {
+                    mWaitGrpImg.setVisibility(View.INVISIBLE);
+                    waitDownload = false;
+                    Toast.makeText(SelectActivity.this,
+                            "Error loading groups: " + ex.getMessage(), Toast.LENGTH_SHORT).show();
+                });
+
+                return null;
+            });
+        } catch (Exception e) {
+            Log.e(TAG, "Error in chargGrps: " + e.getMessage(), e);
+
+            runOnUiThread(() -> {
+                if (binding != null) {
+                    binding.selectActivityWaitGrpImg.setVisibility(View.INVISIBLE);
+                }
+                waitDownload = false;
+                Toast.makeText(this, "Error loading groups: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+            });
+        }
+    }
+
     private void makeRsds() {
-        TextView mSpinnerRsd = binding.selectActivityRsdSpinner;
+        try {
+            TextView mSpinnerRsd = binding.selectActivityRsdSpinner;
 
-        Iterator<String> keys_rsds = dataGrps.get(grp).keys();
-
-        while( keys_rsds.hasNext() ) {
-            try{
-                String kr = keys_rsds.next();
-                ListResidModel fiche = new ListResidModel();
-                JSONObject obj = dataGrps.get(grp).getJSONObject(kr);
-
-                fiche.setId(Integer.parseInt(obj.getString("id")));
-                fiche.setAgc(agcSelected);
-                fiche.setGrp(grpSelected);
-                fiche.setRef(obj.getString("ref"));
-                fiche.setName(obj.getString("name"));
-                fiche.setEntry(obj.getString("entry"));
-                fiche.setAdresse(obj.getString("adr"));
-                fiche.setCity(obj.getString("cp"), obj.getString("city"));
-
-                idRsds.add(String.valueOf(fiche.getId()));
-                nameRsds.add(fiche);
-                nbRsds++;
-            } catch (JSONException e) {
-                e.printStackTrace();
+            if (grp < 0 || grp >= dataGrps.size()) {
+                Log.e(TAG, "Invalid group index: " + grp);
+                runOnUiThread(() -> Toast.makeText(this, "Invalid group index: " + grp, Toast.LENGTH_SHORT).show());
+                return;
             }
-        }
 
-        SelectActivity.this.runOnUiThread(() -> mSpinnerRsd.setText("Sélectionner une résidence"));
+            idRsds.clear();
+            nameRsds.clear();
+            nbRsds = 0;
 
-        if( !rsdSelected.isEmpty() ) {
-            if( idRsds.contains(rsdSelected) ) {
-                rsd = idRsds.indexOf(rsdSelected);
-                String m = nameRsds.get(rsd).getName() + " " + nameRsds.get(rsd).getAdress();
-
-                SelectActivity.this.runOnUiThread(() -> mSpinnerRsd.setText(m));
-            } else {
-                Toast.makeText(SelectActivity.this, "Résidence inconnue", Toast.LENGTH_SHORT).show();
+            JSONObject grpData = dataGrps.get(grp);
+            if (grpData == null) {
+                Log.e(TAG, "Group data is null");
+                runOnUiThread(() -> Toast.makeText(SelectActivity.this, "No data available for this group", Toast.LENGTH_SHORT).show());
+                return;
             }
+
+            Iterator<String> keys_rsds;
+            try {
+                keys_rsds = grpData.keys();
+            } catch (Exception e) {
+                Log.e(TAG, "Error getting keys from group data: " + e.getMessage(), e);
+                runOnUiThread(() -> Toast.makeText(SelectActivity.this, "Error processing residence data", Toast.LENGTH_SHORT).show());
+                return;
+            }
+
+            while (keys_rsds.hasNext()) {
+                try {
+                    String kr = keys_rsds.next();
+                    JSONObject obj = grpData.getJSONObject(kr);
+
+                    // Safely extract data with proper validation
+                    String id = obj.optString("id", "");
+                    if (id.isEmpty()) {
+                        Log.w(TAG, "Residence with empty ID found, skipping");
+                        runOnUiThread(() -> Toast.makeText(SelectActivity.this,"Residence with empty ID found, skipping", Toast.LENGTH_SHORT).show());
+                        continue;
+                    }
+
+                    ListResidModel fiche = new ListResidModel();
+
+                    // Use optString to safely get JSON values with defaults
+                    fiche.setId(Integer.parseInt(id));
+                    fiche.setAgc(agcSelected);
+                    fiche.setGrp(grpSelected);
+                    fiche.setRef(obj.optString("ref", ""));
+                    fiche.setName(obj.optString("name", ""));
+                    fiche.setEntry(obj.optString("entry", ""));
+                    fiche.setAdresse(obj.optString("adr", ""));
+                    fiche.setCity(obj.optString("cp", ""), obj.optString("city", ""));
+                    // Set last control date if available
+                    if (obj.has("last")) {
+                        fiche.setLast(obj.optString("last", ""));
+                    }
+
+                    idRsds.add(String.valueOf(fiche.getId()));
+                    nameRsds.add(fiche);
+                    nbRsds++;
+                } catch (JSONException e) {
+                    Log.e(TAG, "Error processing residence data: " + e.getMessage(), e);
+                    runOnUiThread(() -> Toast.makeText(SelectActivity.this, "Error processing residence data", Toast.LENGTH_SHORT).show());
+                    continue;
+                } catch (NumberFormatException e) {
+                    Log.e(TAG, "Error parsing residence ID: " + e.getMessage(), e);
+                    runOnUiThread(() -> Toast.makeText(SelectActivity.this, "Error parsing residence ID", Toast.LENGTH_SHORT).show());
+                    continue;
+                }
+            }
+
+            // Set default message
+            String displayMessage = "Select a residence";
+
+            // Check if we have a previously selected residence
+            if (!rsdSelected.isEmpty()) {
+                int selectedIndex = idRsds.indexOf(rsdSelected);
+                if (selectedIndex >= 0 && selectedIndex < nameRsds.size()) {
+                    rsd = selectedIndex;
+                    ListResidModel selectedResid = nameRsds.get(rsd);
+                    displayMessage = selectedResid.getName();
+                    if (!selectedResid.getAdress().isEmpty()) {
+                        displayMessage += " " + selectedResid.getAdress();
+                    }
+                } else {
+                    Log.w(TAG, "Previously selected residence not found: " + rsdSelected);
+                    runOnUiThread(() -> Toast.makeText(SelectActivity.this, "Selected residence no longer available", Toast.LENGTH_SHORT).show());
+                    rsdSelected = "";
+                    rsd = -1;
+                }
+            }
+
+            // Update UI on the main thread
+            final String finalMessage = displayMessage;
+            runOnUiThread(() -> mSpinnerRsd.setText(finalMessage));
+
+            // Log residence count
+            Log.d(TAG, "Loaded " + nbRsds + " residences");
+
+            if (nbRsds == 0) {
+                runOnUiThread(() -> Toast.makeText(SelectActivity.this, "No residences available for this group", Toast.LENGTH_SHORT).show());
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error in makeRsds: " + e.getMessage(), e);
+            runOnUiThread(() -> Toast.makeText(SelectActivity.this, "Error loading residences: " + e.getMessage(), Toast.LENGTH_SHORT).show());
         }
     }
 
-    private void showWait(Boolean b) {
-        pl.droidsonroids.gif.GifImageView mImgWait = binding.selectActivityWaitImg;
+    /**
+     * Shows or hides the wait indicator.
+     *
+     * @param show True to show the indicator, false to hide it
+     */
+    private void showWait(boolean show) {
+        try {
+            pl.droidsonroids.gif.GifImageView mImgWait = binding.selectActivityWaitImg;
 
-        runOnUiThread(() -> {
-            if( b ) {
-                mImgWait.setVisibility(View.VISIBLE);
-            } else {
-                mImgWait.setVisibility(View.INVISIBLE);
-            }
-        });
+            runOnUiThread(() -> mImgWait.setVisibility(show ? View.VISIBLE : View.INVISIBLE));
+        } catch (Exception e) {
+            Log.e(TAG, "Error in showWait: " + e.getMessage(), e);
+            runOnUiThread(() -> Toast.makeText(this, "Error showing wait indicator: " + e.getMessage(), Toast.LENGTH_SHORT).show());
+        }
     }
 
 }
