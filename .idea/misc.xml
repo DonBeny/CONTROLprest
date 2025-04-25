@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="DesignSurface">
+    <option name="filePathToZoomLevelMap">
+      <map>
+        <entry key="..\:/AndroidStudioProjects/CONTROLprest/app/src/main/res/drawable-v24/ic_launcher_foreground.xml" value="0.1" />
+        <entry key="..\:/AndroidStudioProjects/CONTROLprest/app/src/main/res/drawable/button_enabled.xml" value="0.1" />
+        <entry key="..\:/AndroidStudioProjects/CONTROLprest/app/src/main/res/drawable/button_selected.xml" value="0.1" />
+        <entry key="..\:/AndroidStudioProjects/CONTROLprest/app/src/main/res/drawable/button_standard.xml" value="0.1" />
+        <entry key="..\:/AndroidStudioProjects/CONTROLprest/app/src/main/res/drawable/ic_launcher_background.xml" value="0.1" />
+        <entry key="..\:/AndroidStudioProjects/CONTROLprest/app/src/main/res/layout-sw600dp/activity_login.xml" value="0.4125" />
+        <entry key="..\:/AndroidStudioProjects/CONTROLprest/app/src/main/res/layout-sw600dp/activity_nfs.xml" value="0.4125" />
+        <entry key="..\:/AndroidStudioProjects/CONTROLprest/app/src/main/res/layout-sw600dp/activity_select.xml" value="0.4125" />
+        <entry key="..\:/AndroidStudioProjects/CONTROLprest/app/src/main/res/layout/activity_get_mail.xml" value="0.26038500506585616" />
+        <entry key="..\:/AndroidStudioProjects/CONTROLprest/app/src/main/res/layout/activity_login.xml" value="0.25" />
+        <entry key="..\:/AndroidStudioProjects/CONTROLprest/app/src/main/res/layout/activity_main.xml" value="0.5" />
+        <entry key="..\:/AndroidStudioProjects/CONTROLprest/app/src/main/res/layout/activity_make_select.xml" value="0.26038500506585616" />
+        <entry key="..\:/AndroidStudioProjects/CONTROLprest/app/src/main/res/layout/activity_nfs.xml" value="0.26038500506585616" />
+        <entry key="..\:/AndroidStudioProjects/CONTROLprest/app/src/main/res/layout/activity_search.xml" value="0.26038500506585616" />
+        <entry key="..\:/AndroidStudioProjects/CONTROLprest/app/src/main/res/layout/activity_select.xml" value="0.26038500506585616" />
+        <entry key="..\:/AndroidStudioProjects/CONTROLprest/app/src/main/res/layout/agence_item.xml" value="0.2672239108409321" />
+        <entry key="..\:/AndroidStudioProjects/CONTROLprest/app/src/main/res/layout/group_item.xml" value="0.26671732522796354" />
+        <entry key="..\:/AndroidStudioProjects/CONTROLprest/app/src/main/res/layout/resid_item.xml" value="0.2672239108409321" />
+        <entry key="..\:/AndroidStudioProjects/CONTROLprest/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml" value="0.121" />
+      </map>
+    </option>
+  </component>
+  <component name="ProjectRootManager" version="2" languageLevel="JDK_17" default="true" project-jdk-name="jbr-17" project-jdk-type="JavaSDK">
+    <output url="file://$PROJECT_DIR$/build/classes" />
+  </component>
+  <component name="ProjectType">
+    <option name="id" value="Android" />
+  </component>
+</project>

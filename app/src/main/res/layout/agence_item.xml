@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:paddingHorizontal="50dp"
+    android:paddingVertical="30dp"
+    android:layout_margin="5dp"
+    android:background="@drawable/button_enabled"
+    android:orientation="horizontal">
+
+    <TextView android:id="@+id/agence_item_name"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:textStyle="bold"
+        android:tag="0"/>
+
+</LinearLayout>

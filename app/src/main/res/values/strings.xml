@@ -1,0 +1,80 @@
+<resources>
+    <string name="app_name" translatable="false">CONTROLprest</string>
+    <string name="hint_pseudo" translatable="false">Pseudo</string>
+    <string name="hint_password">Password</string>
+    <string name="tag_new" translatable="false">new</string>
+    <string name="btn_connexion" translatable="false">CONNEXION</string>
+    <string name="lbl_rgpd" translatable="false">J\'ai lu et j\'accepte les conditions de protection des données personnelles</string>
+    <string name="tag_robot" translatable="false">robot</string>
+    <string name="btn_requet_robot" translatable="false">J\'ai oublié de me déconnecter</string>
+    <string name="tag_mail" translatable="false">mail</string>
+    <string name="btn_requet_mail" translatable="false">J\'ai oublié mes identifiants</string>
+    <string name="btn_deco" translatable="false">DECONNEXION</string>
+    <string name="mess_conextion_lost" translatable="false">Récupérez un connection</string>
+    <string name="mess_echec_conexion" translatable="false">Connexion failed</string>
+    <string name="mess_err_rgpd" translatable="false">Vous devez accepter les conditions de protection des données personnelles pour continuer</string>
+    <string name="mess_err_conex" translatable="false">Saisissez votre pseudo et votre mot de passe pour continuer</string>
+    <string name="mess_bad_permission_internet" translatable="false">Vous ne pouvez utiliser l\'application sans accès au réseau</string>
+    <string name="mess_bad_permission_camera">You can\'t use camera without permission</string>
+    <string name="mess_bad_permission_write" translatable="false">Vous ne pouvez enregistrer les prise de vue sans permission</string>
+    <string name="hint_get_mail" translatable="false">Entrez votre adresse de contact</string>
+    <string name="btn_valid">Validate</string>
+    <string name="btn_send">Send</string>
+    <string name="mess_unlock_acces">unlock access</string>
+    <string name="mess_get_identifient">get your identifients</string>
+    <string name="mess_mail_send">A mail was send to</string>
+    <string name="lbl_selection">Select</string>
+    <string name="_prev" translatable="false"><![CDATA[<]]></string>
+    <string name="hint_search">Search an entry</string>
+    <string name="lbl_agc">Agency</string>
+    <string name="lbl_grp">Groupment</string>
+    <string name="lbl_rsd">Residence</string>
+    <string name="btn_controler" translatable="false">CONTROL</string>
+    <string name="btn_commencer">Start</string>
+    <string name="lbl_select_entry">Select an entry</string>
+    <string name="lbl_hebdomadaire">Weekly</string>
+    <string name="lbl_mensuel">Monthly</string>
+    <string name="lbl_trimestriel" translatable="false">Trimestriel</string>
+    <string name="lbl_semestriel" translatable="false">Semestriel</string>
+    <string name="lbl_annuel">Yearly</string>
+    <string name="hint_name_rsd">Name</string>
+    <string name="hint_ref_rsd">Reference</string>
+    <string name="hint_entry_rsd">Entry</string>
+    <string name="hint_adr_rsd">Adress</string>
+    <string name="btn_finish">Finish</string>
+    <string name="hint_icon" translatable="false">icon</string>
+    <string name="lbl_zone" translatable="false">Zone</string>
+    <string name="lbl_point" translatable="false">Point</string>
+    <string name="btn_no">Not conform</string>
+    <string name="hint_point" translatable="false">Point</string>
+    <string name="btn_yes">Conform</string>
+    <string name="lbl_comment">Comment</string>
+    <string name="btn_save">Save</string>
+    <string name="btn_capture" translatable="false">Capture</string>
+    <string name="lbl_prise_de_vue" translatable="false">Capture</string>
+    <string name="lbl_sign" translatable="false">Signature</string>
+    <string name="lbl_finish">End of control</string>
+    <string name="lbl_send">Send</string>
+    <string name="btn_clear">Clear</string>
+    <string name="hint_dest">To</string>
+    <string name="hint_message">Your message</string>
+    <string name="mess_echec_act" translatable="false">Echec</string>
+    <string name="lbl_urgence" translatable="false">Urgence</string>
+    <string name="hint_comment">Enter your comment here</string>
+    <string name="lbl_info" translatable="false">\?</string>
+    <string name="lbl_bad_version" translatable="false">Une nouvelle version est disponible.\nMettez à jour votre application pour continuer.</string>
+    <string name="mess_comment_bad" translatable="false">Vous devez laisser un commentaire.</string>
+    <string name="lbl_img" translatable="false">Désordre technique</string>
+    <string name="mess_use_finish">Use END button</string>
+    <string name="btn_next">next</string>
+    <string name="_dest" translatable="false">Destinataire</string>
+    <string name="entry_lbl" translatable="false">Entrée :</string>
+    <string name="adresse_lbl" translatable="false">Adresse :</string>
+    <string name="last_ctrl_lbl" translatable="false">dernier contrôle :</string>
+    <string name="lbl_write_nfs">To write</string>
+    <string name="lbl_load_nfs">Loaded</string>
+    <string name="mess_bad_nfc">You can\'t use this app without NFC service activated</string>
+    <string name="txt_close_tag">Tag succefuly programed. Tap to close.</string>
+    <string name="txt_wait_tag">Put tag to proced.</string>
+    <string name="mess_timeout">Temps de réception des données dépassé</string>
+</resources>

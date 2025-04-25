@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="hint_password">Mot de passe</string>
+    <string name="mess_bad_permission_camera">Vous ne pourrez utiliser la camèra sans autorisation</string>
+    <string name="btn_valid">Valider</string>
+    <string name="btn_send">Envoyer</string>
+    <string name="mess_unlock_acces">Débloquer votre accès</string>
+    <string name="mess_get_identifient">Récupérer vos identifiants</string>
+    <string name="mess_mail_send">Un mail a été envoyé à</string>
+    <string name="lbl_selection">Sélectionner</string>
+    <string name="hint_search">Rechercher une entrée</string>
+    <string name="lbl_agc">Agence</string>
+    <string name="lbl_grp">Groupement</string>
+    <string name="lbl_rsd">Résidence</string>
+    <string name="btn_commencer">Commencer</string>
+    <string name="lbl_select_entry">Sélectionner une entrée</string>
+    <string name="lbl_hebdomadaire">Hebdomadaire</string>
+    <string name="lbl_mensuel">Mensuel</string>
+    <string name="lbl_annuel">Annuel</string>
+    <string name="hint_name_rsd">Nom</string>
+    <string name="hint_ref_rsd">Référence</string>
+    <string name="hint_entry_rsd">Entrée</string>
+    <string name="hint_adr_rsd">Adresse</string>
+    <string name="btn_finish">Terminer</string>
+    <string name="btn_no">Non conforme</string>
+    <string name="btn_yes">Conforme</string>
+    <string name="lbl_comment">Commentaire</string>
+    <string name="btn_save">Enregistrer</string>
+    <string name="lbl_finish">Fin du contrôle</string>
+    <string name="lbl_send">Envoyer</string>
+    <string name="btn_clear">Vider</string>
+    <string name="hint_dest">à</string>
+    <string name="hint_message">Votre message</string>
+    <string name="hint_comment">Entrez votre commentaire ici</string>
+    <string name="mess_use_finish">Utilisez le bouton Terminer</string>
+    <string name="btn_next">Suivant</string>
+    <string name="lbl_write_nfs">A écrire</string>
+    <string name="lbl_load_nfs">Lu</string>
+    <string name="mess_bad_nfc">Vous ne pouvez utiliser cette appli sans les services NFC activés</string>
+    <string name="txt_close_tag">Puce programmée avec succés. Tapez pour fermer.</string>
+    <string name="txt_wait_tag">Présentez votre puce à votre appareil</string>
+    <string name="mess_timeout">Temps de réception des données dépassé</string>
+</resources>

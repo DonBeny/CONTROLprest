@@ -1,0 +1,219 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+
+    android:orientation="vertical"
+
+    android:background="@drawable/fond_vertical_green"
+
+    tools:context=".controllers.activities.LoginActivity">
+
+    <androidx.constraintlayout.widget.ConstraintLayout android:id="@+id/login_activity_connect_lyt"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+
+        android:orientation="vertical"
+        android:visibility="visible" >
+
+        <LinearLayout android:id="@+id/login_activity_id_lyt"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintLeft_toLeftOf="parent"
+            app:layout_constraintRight_toRightOf="parent"
+            app:layout_constraintBottom_toTopOf="@id/login_activity_go_lyt"
+
+            android:orientation="vertical">
+
+            <EditText
+                android:id="@+id/login_activity_username_txt"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+
+                android:layout_marginHorizontal="150dp"
+                android:padding="10dp"
+
+                android:inputType="text"
+                android:maxLines="1"
+                android:singleLine="true"
+                android:hint="@string/hint_pseudo"/>
+
+            <EditText
+                android:id="@+id/login_activity_password_txt"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+
+                android:layout_marginHorizontal="150dp"
+                android:layout_marginTop="50dp"
+                android:padding="10dp"
+
+                android:inputType="textPassword"
+                android:maxLines="1"
+                android:singleLine="true"
+                android:hint="@string/hint_password"/>
+
+        </LinearLayout>
+
+        <LinearLayout android:id="@+id/login_activity_go_lyt"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+
+            app:layout_constraintTop_toBottomOf="@id/login_activity_id_lyt"
+            app:layout_constraintLeft_toLeftOf="parent"
+            app:layout_constraintRight_toRightOf="parent"
+            app:layout_constraintBottom_toTopOf="@id/login_activity_btn_lyt"
+
+            android:orientation="vertical">
+
+            <RelativeLayout android:id="@+id/login_activity_connect_blk"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+
+                app:layout_constraintTop_toBottomOf="@id/login_activity_password_txt"
+                app:layout_constraintLeft_toLeftOf="parent"
+                app:layout_constraintRight_toRightOf="parent"
+                app:layout_constraintBottom_toTopOf="@id/login_activity_rgpd_chx"
+
+                android:orientation="horizontal">
+
+                <Button android:id="@+id/login_activity_connect_btn"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+
+                    android:layout_gravity="center_horizontal"
+                    android:layout_marginHorizontal="250dp"
+                    android:padding="10dp"
+
+                    android:onClick="loginActivityActions"
+                    android:tag="on"
+
+                    android:background="@drawable/button_selected"
+                    android:text="@string/btn_connexion"
+                    android:textSize="30sp"
+                    android:textColor="@color/white"/>
+
+                <pl.droidsonroids.gif.GifImageView android:id="@+id/login_activity_wait_img"
+                    android:layout_width="30dp"
+                    android:layout_height="30dp"
+
+                    android:layout_alignParentEnd="true"
+                    android:layout_marginEnd="200dp"
+                    android:layout_marginTop="15dp"
+
+                    android:visibility="invisible"
+
+                    android:src="@drawable/load" />
+
+            </RelativeLayout>
+
+            <CheckBox android:id="@+id/login_activity_rgpd_chx"
+                android:layout_width="450dp"
+                android:layout_height="wrap_content"
+
+                android:layout_gravity="center_horizontal"
+                android:layout_marginTop="20dp"
+
+                android:textSize="12sp"
+                android:text="@string/lbl_rgpd"
+
+                android:checked="true" />
+
+        </LinearLayout>
+
+        <LinearLayout android:id="@+id/login_activity_btn_lyt"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+
+            app:layout_constraintTop_toBottomOf="@id/login_activity_go_lyt"
+            app:layout_constraintLeft_toLeftOf="parent"
+            app:layout_constraintRight_toRightOf="parent"
+            app:layout_constraintBottom_toBottomOf="parent"
+
+            android:orientation="vertical">
+
+            <Button android:id="@+id/login_activity_robot_btn"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+
+                android:layout_gravity="center_horizontal"
+                android:padding="5dp"
+                android:background="@android:color/transparent"
+
+                android:onClick="loginActivityActions"
+                android:tag="@string/tag_robot"
+
+                android:text="@string/btn_requet_robot"
+                android:textColor="@color/black" />
+
+            <Button android:id="@+id/login_activity_mail_btn"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+
+                android:layout_gravity="center_horizontal"
+                android:layout_marginTop="20dp"
+                android:layout_marginBottom="100dp"
+                android:padding="5dp"
+                android:background="@android:color/transparent"
+
+                android:onClick="loginActivityActions"
+                android:tag="mail"
+
+                android:textColor="@color/black"
+                android:text="@string/btn_requet_mail" />
+
+        </LinearLayout>
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
+
+    <LinearLayout android:id="@+id/login_activity_deco_lyt"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+
+        android:visibility="gone"
+
+        android:orientation="vertical" >
+
+        <Button android:id="@+id/login_activity_deco_btn"
+            android:layout_width="500dp"
+            android:layout_height="wrap_content"
+
+            android:layout_gravity="center_horizontal"
+            android:layout_marginTop="250dp"
+            android:background="@drawable/button_selected"
+            android:padding="10dp"
+
+            android:onClick="loginActivityActions"
+            android:tag="off"
+
+            android:text="@string/btn_deco"
+            android:textColor="@color/white"
+            android:textSize="50sp" />
+
+    </LinearLayout>
+
+    <LinearLayout android:id="@+id/login_activity_version_lyt"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+
+        android:gravity="center_horizontal|center_vertical"
+        android:visibility="gone"
+        android:orientation="horizontal">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+
+            android:gravity="center_horizontal|center_vertical"
+            android:text="@string/lbl_bad_version"
+            android:textSize="18sp"
+            android:textStyle="bold" />
+
+    </LinearLayout>
+
+</LinearLayout>

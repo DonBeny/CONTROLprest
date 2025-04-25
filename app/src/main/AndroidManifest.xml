@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="org.orgaprop.controlprest">
+
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.NFC" />
+
+    <uses-feature
+        android:name="android.hardware.nfc"
+        android:required="true" />
+
+    <application
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:theme="@style/Theme.CONTROLprest">
+        <activity
+            android:name=".controllers.activities.NfsActivity"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.nfc.action.TAG_DISCOVERED" />
+                <action android:name="android.nfc.action.NDEF_DISCOVERED" />
+                <action android:name="android.nfc.action.TECH_DISCOVERED" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+        <activity
+            android:name=".controllers.activities.MakeSelectActivity"
+            android:exported="false" />
+        <activity
+            android:name=".controllers.activities.SearchActivity"
+            android:exported="false" />
+        <activity
+            android:name=".controllers.activities.SelectActivity"
+            android:exported="false" />
+        <activity
+            android:name=".controllers.activities.GetMailActivity"
+            android:exported="false" />
+        <activity
+            android:name=".controllers.activities.LoginActivity"
+            android:exported="false" />
+        <activity
+            android:name=".controllers.activities.MainActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+
+</manifest>
