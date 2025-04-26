@@ -19,7 +19,6 @@ import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.EditText;
 import android.widget.TextView;
-import android.widget.Toast;
 
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -27,7 +26,8 @@ import org.orgaprop.controlprest.R;
 import org.orgaprop.controlprest.databinding.ActivitySelectBinding;
 import org.orgaprop.controlprest.models.ListResidModel;
 import org.orgaprop.controlprest.services.HttpTask;
-import org.orgaprop.controlprest.services.Prefs;
+import org.orgaprop.controlprest.services.PreferencesManager;
+import org.orgaprop.controlprest.utils.ToastManager;
 
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -43,7 +43,7 @@ public class SelectActivity extends AppCompatActivity {
 
 //********* PRIVATE VARIABLES
 
-    private Prefs prefs;
+    private PreferencesManager preferencesManager;
 
     private boolean isStarted;
     private boolean canCheck;
@@ -98,7 +98,7 @@ public class SelectActivity extends AppCompatActivity {
                 result -> handleActivityResult(result.getResultCode(), result.getData())
         );
 
-        prefs = new Prefs(this);
+        preferencesManager = PreferencesManager.getInstance(this);
 
         isStarted = false;
         canCheck = true;
@@ -144,7 +144,7 @@ public class SelectActivity extends AppCompatActivity {
             }
         } catch (Exception e) {
             Log.e(TAG, "Error in onCreate: " + e.getMessage(), e);
-            Toast.makeText(this, "Error initializing: " + e.getMessage(), Toast.LENGTH_LONG).show();
+            ToastManager.showError("Error initializing: " + e.getMessage());
         }
     }
 
@@ -166,6 +166,7 @@ public class SelectActivity extends AppCompatActivity {
     protected void onDestroy() {
         try {
             super.onDestroy();
+
             // Clean up resources
             idAgcs.clear();
             idGrps.clear();
@@ -176,7 +177,7 @@ public class SelectActivity extends AppCompatActivity {
             dataGrps.clear();
         } catch (Exception e) {
             Log.e(TAG, "Error in onDestroy: " + e.getMessage(), e);
-            Toast.makeText(this, "Error cleaning up: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+            ToastManager.showError("Error cleaning up: " + e.getMessage());
         }
     }
 
@@ -186,7 +187,7 @@ public class SelectActivity extends AppCompatActivity {
         try {
             if (v == null || v.getTag() == null) {
                 Log.e(TAG, "View or view tag is null");
-                Toast.makeText(this, "View or view tag is null", Toast.LENGTH_SHORT).show();
+                ToastManager.showError("View or view tag is null");
                 return;
             }
 
@@ -205,12 +206,12 @@ public class SelectActivity extends AppCompatActivity {
                     break;
                 default:
                     Log.w(TAG, "Unknown view tag: " + viewTag);
-                    Toast.makeText(this, "Unknown view tag: " + viewTag, Toast.LENGTH_SHORT).show();
+                    ToastManager.showError("Unknown view tag: " + viewTag);
                     break;
             }
         } catch (Exception e) {
             Log.e(TAG, "Error in selectActivityActions: " + e.getMessage(), e);
-            Toast.makeText(this, "Error processing action: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+            ToastManager.showError("Error processing action: " + e.getMessage());
         }
     }
 
@@ -230,7 +231,7 @@ public class SelectActivity extends AppCompatActivity {
                     boolean b_rsds = false;
 
                     Log.d(TAG, "handleActivityResult => search return");
-                    Toast.makeText(this, "handleActivityResult => search return", Toast.LENGTH_SHORT).show();
+                    ToastManager.showShort("handleActivityResult => search return");
 
                     agcSelected = data.getStringExtra(SearchActivity.SELECT_SEARCH_ACTIVITY_RESULT_AGC);
                     grpSelected = data.getStringExtra(SearchActivity.SELECT_SEARCH_ACTIVITY_RESULT_GRP);
@@ -278,7 +279,7 @@ public class SelectActivity extends AppCompatActivity {
                             }
                         } else {
                             Log.e(TAG, "Invalid agency index: " + newAgc);
-                            Toast.makeText(this, "Error: Invalid agency selection", Toast.LENGTH_SHORT).show();
+                            ToastManager.showError("Invalid agency selection");
                         }
                     }
                 } else if (Objects.equals(typeResult, MAKE_SELECT_ACTIVITY_REQUEST)) {
@@ -310,7 +311,7 @@ public class SelectActivity extends AppCompatActivity {
                                 chargGrps();
                             } else {
                                 Log.e(TAG, "Invalid agency index: " + newAgc);
-                                Toast.makeText(this, "Error: Invalid agency selection", Toast.LENGTH_SHORT).show();
+                                ToastManager.showError("Invalid agency selection");
                             }
                         }
                     } else if (selectType == MakeSelectActivity.MAKE_SELECT_ACTIVITY_GRP) {
@@ -333,7 +334,7 @@ public class SelectActivity extends AppCompatActivity {
                                 makeRsds();
                             } else if (newGrp < 0 || newGrp >= nameGrps.size()) {
                                 Log.e(TAG, "Invalid group index: " + newGrp);
-                                Toast.makeText(this, "Error: Invalid group selection", Toast.LENGTH_SHORT).show();
+                                ToastManager.showError("Invalid group selection");
                             }
                         }
                     } else if (selectType == MakeSelectActivity.MAKE_SELECT_ACTIVITY_RSD) {
@@ -349,7 +350,7 @@ public class SelectActivity extends AppCompatActivity {
                                 runOnUiThread(() -> mSpinnerRsd.setText(residenceName));
                             } else {
                                 Log.e(TAG, "Invalid residence index: " + newRsd);
-                                Toast.makeText(this, "Error: Invalid residence selection", Toast.LENGTH_SHORT).show();
+                                ToastManager.showError("Invalid residence selection");
                             }
                         }
                     }
@@ -357,7 +358,7 @@ public class SelectActivity extends AppCompatActivity {
             }
         } catch (Exception e) {
             Log.e(TAG, "Error in handleActivityResult: " + e.getMessage(), e);
-            Toast.makeText(this, "Error processing result: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+            ToastManager.showError("processing result: " + e.getMessage());
         }
     }
 
@@ -367,7 +368,7 @@ public class SelectActivity extends AppCompatActivity {
 
             if (mSearchInput == null) {
                 Log.e(TAG, "Search input is null");
-                Toast.makeText(this, "Search input is null", Toast.LENGTH_SHORT).show();
+                ToastManager.showShort("Search input is null");
                 return;
             }
 
@@ -382,11 +383,12 @@ public class SelectActivity extends AppCompatActivity {
 
                 makeSelectActivityLauncher.launch(intent);
             } else if (searchText.isEmpty()) {
-                Toast.makeText(this, "Please enter a search term", Toast.LENGTH_SHORT).show();
+                Log.e(TAG, "Please enter a search term");
+                ToastManager.showError("Please enter a search term");
             }
         } catch (Exception e) {
             Log.e(TAG, "Error in startActivitySearch: " + e.getMessage(), e);
-            Toast.makeText(this, "Error starting search: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+            ToastManager.showError("starting search: " + e.getMessage());
             showWait(false);
         }
     }
@@ -405,7 +407,7 @@ public class SelectActivity extends AppCompatActivity {
                         makeSelectActivityLauncher.launch(intent);
                     } else {
                         Log.e(TAG, "No agencies available");
-                        Toast.makeText(this, "No agencies available", Toast.LENGTH_SHORT).show();
+                        ToastManager.showError("No agencies available");
                     }
                     break;
                 case "grp":
@@ -420,10 +422,10 @@ public class SelectActivity extends AppCompatActivity {
                     } else {
                         if (agc < 0) {
                             Log.e(TAG, "Please select an agency first");
-                            Toast.makeText(this, "Please select an agency first", Toast.LENGTH_SHORT).show();
+                            ToastManager.showError("Please select an agency first");
                         } else if (nbGrps <= 0) {
                             Log.e(TAG, "No groups available");
-                            Toast.makeText(this, "No groups available", Toast.LENGTH_SHORT).show();
+                            ToastManager.showError("No groups available");
                         }
                     }
                     break;
@@ -439,24 +441,24 @@ public class SelectActivity extends AppCompatActivity {
                     } else {
                         if (agc < 0) {
                             Log.e(TAG, "Please select an agency first");
-                            Toast.makeText(this, "Please select an agency first", Toast.LENGTH_SHORT).show();
+                            ToastManager.showError("Please select an agency first");
                         } else if (grp < 0) {
                             Log.e(TAG, "Please select a group first");
-                            Toast.makeText(this, "Please select a group first", Toast.LENGTH_SHORT).show();
+                            ToastManager.showError("Please select a group first");
                         } else if (nbRsds <= 0) {
                             Log.e(TAG, "No residences available");
-                            Toast.makeText(this, "No residences available", Toast.LENGTH_SHORT).show();
+                            ToastManager.showError("No residences available");
                         }
                     }
                     break;
                 default:
                     Log.w(TAG, "Unknown type select: " + typeSelect);
-                    Toast.makeText(this, "Unknown type select: " + typeSelect, Toast.LENGTH_SHORT).show();
+                    ToastManager.showError("Unknown type select: " + typeSelect);
                     break;
             }
         } catch (Exception e) {
             Log.e(TAG, "Error in startActivitySelect: " + e.getMessage(), e);
-            Toast.makeText(this, "Error starting selection: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+            ToastManager.showError("starting select: " + e.getMessage());
             showWait(false);
         }
     }
@@ -467,9 +469,9 @@ public class SelectActivity extends AppCompatActivity {
                 isStarted = true;
                 canCheck = false;
 
-                prefs.setAgency(agcSelected);
-                prefs.setGroup(grpSelected);
-                prefs.setResidence(rsdSelected);
+                preferencesManager.setAgency(agcSelected);
+                preferencesManager.setGroup(grpSelected);
+                preferencesManager.setResidence(rsdSelected);
 
                 Intent intent = new Intent(SelectActivity.this, NfsActivity.class);
                 intent.putExtra(SELECT_ACTIVITY_RSD, rsdSelected);
@@ -477,11 +479,11 @@ public class SelectActivity extends AppCompatActivity {
                 startActivity(intent);
             } else if (rsd < 0) {
                 Log.e(TAG, "Please select a residence first");
-                Toast.makeText(this, "Please select a residence first", Toast.LENGTH_SHORT).show();
+                ToastManager.showError("Please select a residence first");
             }
         } catch (Exception e) {
             Log.e(TAG, "Error in startActivityStartCtrl: " + e.getMessage(), e);
-            Toast.makeText(this, "Error starting control: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+            ToastManager.showError("starting control: " + e.getMessage());
         }
     }
 
@@ -499,10 +501,10 @@ public class SelectActivity extends AppCompatActivity {
 
             futureResult.thenAccept(result -> {
                 if (result.startsWith("1")) {
-                    prefs.setMbr("new");
-                    prefs.setAgency("");
-                    prefs.setGroup("");
-                    prefs.setResidence("");
+                    preferencesManager.setMbrId("new");
+                    preferencesManager.setAgency("");
+                    preferencesManager.setGroup("");
+                    preferencesManager.setResidence("");
 
                     try {
                         LoginActivity loginActivity = LoginActivity.getInstance();
@@ -512,7 +514,7 @@ public class SelectActivity extends AppCompatActivity {
                     } catch (Exception e) {
                         Log.e(TAG, "Error finishing LoginActivity: " + e.getMessage(), e);
                         runOnUiThread(() ->
-                            Toast.makeText(SelectActivity.this, "Error finishing LoginActivity: " + e.getMessage(), Toast.LENGTH_SHORT).show()
+                            ToastManager.showError("finishing LoginActivity: " + e.getMessage())
                         );
                     }
 
@@ -522,7 +524,7 @@ public class SelectActivity extends AppCompatActivity {
 
                     Log.e(TAG, "Error in deconnectMbr: " + result.substring(1));
                     runOnUiThread(() ->
-                        Toast.makeText(SelectActivity.this, result.substring(1), Toast.LENGTH_SHORT).show()
+                        ToastManager.showError(result.substring(1))
                     );
 
                     try {
@@ -533,7 +535,7 @@ public class SelectActivity extends AppCompatActivity {
                     } catch (Exception e) {
                         Log.e(TAG, "Error finishing LoginActivity: " + e.getMessage(), e);
                         runOnUiThread(() ->
-                            Toast.makeText(SelectActivity.this, "Error finishing LoginActivity: " + e.getMessage(), Toast.LENGTH_SHORT).show()
+                            ToastManager.showError("finishing LoginActivity: " + e.getMessage())
                         );
                     }
 
@@ -546,8 +548,7 @@ public class SelectActivity extends AppCompatActivity {
                         "Network connection error";
 
                 Log.e(TAG, "Error in deconnectMbr: " + ex.getMessage(), ex);
-                runOnUiThread(() -> Toast.makeText(SelectActivity.this,
-                    errorMessage, Toast.LENGTH_SHORT).show());
+                runOnUiThread(() -> ToastManager.showError(errorMessage));
 
                 try {
                     LoginActivity loginActivity = LoginActivity.getInstance();
@@ -557,7 +558,7 @@ public class SelectActivity extends AppCompatActivity {
                 } catch (Exception e) {
                     Log.e(TAG, "Error finishing LoginActivity: " + e.getMessage(), e);
                     runOnUiThread(() ->
-                        Toast.makeText(SelectActivity.this, "Error finishing LoginActivity: " + e.getMessage(), Toast.LENGTH_SHORT).show()
+                        ToastManager.showError("finishing LoginActivity: " + e.getMessage())
                     );
                 }
 
@@ -566,7 +567,7 @@ public class SelectActivity extends AppCompatActivity {
             });
         } catch (Exception e) {
             Log.e(TAG, "Error in deconnectMbr: " + e.getMessage(), e);
-            Toast.makeText(this, "Disconnection error: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+            ToastManager.showError("Disconnection error: " + e.getMessage());
             showWait(false);
         }
     }
@@ -586,7 +587,7 @@ public class SelectActivity extends AppCompatActivity {
 
             if (agenciesData == null || agenciesData.isEmpty()) {
                 Log.e(TAG, "Agencies data is null or empty");
-                Toast.makeText(this, "No agencies data available", Toast.LENGTH_SHORT).show();
+                ToastManager.showError("No agencies data available");
                 return;
             }
 
@@ -613,7 +614,7 @@ public class SelectActivity extends AppCompatActivity {
                         nbAgcs++;
                     } else {
                         Log.w(TAG, "Invalid agency format: " + item);
-                        Toast.makeText(this, "Invalid agency format: " + item, Toast.LENGTH_SHORT).show();
+                        ToastManager.showError("Invalid agency format: " + item);
                     }
                 }
             } else if (tokenizer.countTokens() == 1) {
@@ -627,7 +628,7 @@ public class SelectActivity extends AppCompatActivity {
                     nbAgcs = 1;
                 } else {
                     Log.w(TAG, "Invalid agency format: " + item);
-                    Toast.makeText(this, "Invalid agency format: " + item, Toast.LENGTH_SHORT).show();
+                    ToastManager.showError("Invalid agency format: " + item);
                 }
             }
 
@@ -646,7 +647,7 @@ public class SelectActivity extends AppCompatActivity {
             waitDownload = false;
         } catch (Exception e) {
             Log.e(TAG, "Error in chargAgcs: " + e.getMessage(), e);
-            Toast.makeText(this, "Error loading agencies: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+            ToastManager.showError("loading agencies: " + e.getMessage());
             waitDownload = false;
         }
     }
@@ -681,8 +682,7 @@ public class SelectActivity extends AppCompatActivity {
                             String jsonData = result.substring(1);
                             if (jsonData.isEmpty()) {
                                 Log.w(TAG, "Empty JSON data received");
-                                runOnUiThread(() -> Toast.makeText(SelectActivity.this,
-                                        "No group data received", Toast.LENGTH_SHORT).show());
+                                runOnUiThread(() -> ToastManager.showError("No group data received"));
                                 return;
                             }
 
@@ -704,8 +704,7 @@ public class SelectActivity extends AppCompatActivity {
                                 }
                             } else {
                                 Log.w(TAG, "No 'grps' key in JSON data");
-                                runOnUiThread(() -> Toast.makeText(SelectActivity.this,
-                                        "No 'grps' key in JSON data", Toast.LENGTH_SHORT).show());
+                                runOnUiThread(() -> ToastManager.showError("No 'grps' key in JSON data"));
                                 return;
                             }
 
@@ -718,14 +717,12 @@ public class SelectActivity extends AppCompatActivity {
                             }
                         } catch (JSONException e) {
                             Log.e(TAG, "JSON parsing error: " + e.getMessage(), e);
-                            runOnUiThread(() -> Toast.makeText(SelectActivity.this,
-                                    "Error parsing groups data: " + e.getMessage(), Toast.LENGTH_SHORT).show());
+                            runOnUiThread(() -> ToastManager.showError("Error parsing groups data: " + e.getMessage()));
                         }
                     } else {
                         final String errorMessage = result.substring(1);
                         Log.e(TAG, "Error in chargGrps: " + errorMessage);
-                        runOnUiThread(() -> Toast.makeText(SelectActivity.this,
-                                errorMessage, Toast.LENGTH_SHORT).show());
+                        runOnUiThread(() -> ToastManager.showError(errorMessage));
                     }
 
                     final String finalMessage = displayMessage;
@@ -743,8 +740,7 @@ public class SelectActivity extends AppCompatActivity {
                 runOnUiThread(() -> {
                     mWaitGrpImg.setVisibility(View.INVISIBLE);
                     waitDownload = false;
-                    Toast.makeText(SelectActivity.this,
-                            "Error loading groups: " + ex.getMessage(), Toast.LENGTH_SHORT).show();
+                    ToastManager.showError("loading groups: " + ex.getMessage());
                 });
 
                 return null;
@@ -757,7 +753,7 @@ public class SelectActivity extends AppCompatActivity {
                     binding.selectActivityWaitGrpImg.setVisibility(View.INVISIBLE);
                 }
                 waitDownload = false;
-                Toast.makeText(this, "Error loading groups: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                ToastManager.showError("loading groups: " + e.getMessage());
             });
         }
     }
@@ -768,7 +764,7 @@ public class SelectActivity extends AppCompatActivity {
 
             if (grp < 0 || grp >= dataGrps.size()) {
                 Log.e(TAG, "Invalid group index: " + grp);
-                runOnUiThread(() -> Toast.makeText(this, "Invalid group index: " + grp, Toast.LENGTH_SHORT).show());
+                runOnUiThread(() -> ToastManager.showError("Invalid group index: " + grp));
                 return;
             }
 
@@ -779,7 +775,7 @@ public class SelectActivity extends AppCompatActivity {
             JSONObject grpData = dataGrps.get(grp);
             if (grpData == null) {
                 Log.e(TAG, "Group data is null");
-                runOnUiThread(() -> Toast.makeText(SelectActivity.this, "No data available for this group", Toast.LENGTH_SHORT).show());
+                runOnUiThread(() -> ToastManager.showError("No data available for this group"));
                 return;
             }
 
@@ -788,7 +784,7 @@ public class SelectActivity extends AppCompatActivity {
                 keys_rsds = grpData.keys();
             } catch (Exception e) {
                 Log.e(TAG, "Error getting keys from group data: " + e.getMessage(), e);
-                runOnUiThread(() -> Toast.makeText(SelectActivity.this, "Error processing residence data", Toast.LENGTH_SHORT).show());
+                runOnUiThread(() -> ToastManager.showError("processing residence data"));
                 return;
             }
 
@@ -801,7 +797,7 @@ public class SelectActivity extends AppCompatActivity {
                     String id = obj.optString("id", "");
                     if (id.isEmpty()) {
                         Log.w(TAG, "Residence with empty ID found, skipping");
-                        runOnUiThread(() -> Toast.makeText(SelectActivity.this,"Residence with empty ID found, skipping", Toast.LENGTH_SHORT).show());
+                        runOnUiThread(() -> ToastManager.showError("Residence with empty ID found, skipping"));
                         continue;
                     }
 
@@ -826,11 +822,11 @@ public class SelectActivity extends AppCompatActivity {
                     nbRsds++;
                 } catch (JSONException e) {
                     Log.e(TAG, "Error processing residence data: " + e.getMessage(), e);
-                    runOnUiThread(() -> Toast.makeText(SelectActivity.this, "Error processing residence data", Toast.LENGTH_SHORT).show());
+                    runOnUiThread(() -> ToastManager.showError("processing residence data"));
                     continue;
                 } catch (NumberFormatException e) {
                     Log.e(TAG, "Error parsing residence ID: " + e.getMessage(), e);
-                    runOnUiThread(() -> Toast.makeText(SelectActivity.this, "Error parsing residence ID", Toast.LENGTH_SHORT).show());
+                    runOnUiThread(() -> ToastManager.showError("parsing residence ID"));
                     continue;
                 }
             }
@@ -850,7 +846,7 @@ public class SelectActivity extends AppCompatActivity {
                     }
                 } else {
                     Log.w(TAG, "Previously selected residence not found: " + rsdSelected);
-                    runOnUiThread(() -> Toast.makeText(SelectActivity.this, "Selected residence no longer available", Toast.LENGTH_SHORT).show());
+                    runOnUiThread(() -> ToastManager.showError("Selected residence no longer available"));
                     rsdSelected = "";
                     rsd = -1;
                 }
@@ -864,11 +860,11 @@ public class SelectActivity extends AppCompatActivity {
             Log.d(TAG, "Loaded " + nbRsds + " residences");
 
             if (nbRsds == 0) {
-                runOnUiThread(() -> Toast.makeText(SelectActivity.this, "No residences available for this group", Toast.LENGTH_SHORT).show());
+                runOnUiThread(() -> ToastManager.showError("No residences available for this group"));
             }
         } catch (Exception e) {
             Log.e(TAG, "Error in makeRsds: " + e.getMessage(), e);
-            runOnUiThread(() -> Toast.makeText(SelectActivity.this, "Error loading residences: " + e.getMessage(), Toast.LENGTH_SHORT).show());
+            runOnUiThread(() -> ToastManager.showError("loading residences: " + e.getMessage()));
         }
     }
 
@@ -884,7 +880,7 @@ public class SelectActivity extends AppCompatActivity {
             runOnUiThread(() -> mImgWait.setVisibility(show ? View.VISIBLE : View.INVISIBLE));
         } catch (Exception e) {
             Log.e(TAG, "Error in showWait: " + e.getMessage(), e);
-            runOnUiThread(() -> Toast.makeText(this, "Error showing wait indicator: " + e.getMessage(), Toast.LENGTH_SHORT).show());
+            runOnUiThread(() -> ToastManager.showShort("showing wait indicator: " + e.getMessage()));
         }
     }
 

@@ -68,4 +68,5 @@ public class ToastManager {
     public static boolean isInitialized() {
         return applicationContext != null;
     }
+
 }

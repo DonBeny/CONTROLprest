@@ -53,6 +53,7 @@ public class MainActivity extends AppCompatActivity {
     private ExecutorService executorService;
     private AppUpdateManager appUpdateManager;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
+    private AlertDialog myDialog;
 
 //********* PUBLIC VARIABLES
 
@@ -118,6 +119,10 @@ public class MainActivity extends AppCompatActivity {
             if (appUpdateManager != null) {
                 appUpdateManager = null;
             }
+            if (myDialog != null && myDialog.isShowing()) {
+                myDialog.dismiss();
+            }
+            myDialog = null;
         } catch (Exception e) {
             Log.e(TAG, "Erreur dans onDestroy", e);
             Toast.makeText(MainActivity.this, "Erreur dans onDestroy", Toast.LENGTH_LONG).show();
@@ -335,7 +340,9 @@ public class MainActivity extends AppCompatActivity {
                             return;
                         }
 
-                        Task<AppUpdateInfo> appUpdateInfoTask = appUpdateManager.getAppUpdateInfo();
+                        mainHandler.postDelayed(this::startLoginActivity, SPLASH_SCREEN_DELAY);
+
+                        /*Task<AppUpdateInfo> appUpdateInfoTask = appUpdateManager.getAppUpdateInfo();
 
                         appUpdateInfoTask.addOnSuccessListener(appUpdateInfo -> {
                             try {
@@ -383,7 +390,7 @@ public class MainActivity extends AppCompatActivity {
 
                             mainHandler.postDelayed(this::startLoginActivity, SPLASH_SCREEN_DELAY);
                             isCheckingUpdate.set(false);
-                        });
+                        });*/
                     } catch (Exception e) {
                         Log.e(TAG, "Erreur lors de la vérification de mise à jour", e);
                         mainHandler.post(() -> {
@@ -524,7 +531,8 @@ public class MainActivity extends AppCompatActivity {
                         .setNegativeButton("Quitter", (dialog, which) -> finish());
             }
 
-            builder.create().show();
+            myDialog = builder.create();
+            myDialog.show();
         } catch (Exception e) {
             Log.e(TAG, "Erreur lors de l'affichage du dialogue d'erreur", e);
             Toast.makeText(this, "Erreur lors de l'affichage du dialogue d'erreur", Toast.LENGTH_LONG).show();

@@ -17,6 +17,16 @@
         android:theme="@style/Theme.CONTROLprest">
 
         <activity
+            android:name=".controllers.activities.MainActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <activity
             android:name=".controllers.activities.NfsActivity"
             android:exported="false">
             <intent-filter>
@@ -42,16 +52,6 @@
         <activity
             android:name=".controllers.activities.LoginActivity"
             android:exported="false" />
-
-        <activity
-            android:name=".controllers.activities.MainActivity"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-        </activity>
 
     </application>
 

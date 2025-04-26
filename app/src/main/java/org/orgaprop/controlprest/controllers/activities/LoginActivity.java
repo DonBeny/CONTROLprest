@@ -19,13 +19,13 @@ import android.view.inputmethod.InputMethodManager;
 import android.widget.CheckBox;
 import android.widget.EditText;
 import android.widget.LinearLayout;
-import android.widget.Toast;
 
 import org.orgaprop.controlprest.R;
 import org.orgaprop.controlprest.databinding.ActivityLoginBinding;
 import org.orgaprop.controlprest.services.HttpTask;
-import org.orgaprop.controlprest.services.Prefs;
 import org.orgaprop.controlprest.utils.AndyUtils;
+import org.orgaprop.controlprest.utils.ToastManager;
+import org.orgaprop.controlprest.services.PreferencesManager;
 
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
@@ -42,12 +42,11 @@ public class LoginActivity extends AppCompatActivity {
     private static LoginActivity mLoginActivity;
 
     private SharedPreferences preferences;
-    private Prefs prefs;
+    private PreferencesManager preferencesManager;
     private boolean isFirst;
     private AtomicBoolean isConnecting;
     private String userName;
     private String password;
-
 
 //********* PUBLIC VARIABLES
 
@@ -89,7 +88,8 @@ public class LoginActivity extends AppCompatActivity {
             isConnecting = new AtomicBoolean(false);
 
             preferences = getSharedPreferences(PREF_NAME_APPLI, MODE_PRIVATE);
-            prefs = new Prefs(this);
+            preferencesManager = PreferencesManager.getInstance(this);
+            preferencesManager.initializeDefaultPrefsIfNeeded();
 
             userName = preferences.getString(PREF_KEY_MBR, "");
             password = preferences.getString(PREF_KEY_PWD, "");
@@ -109,7 +109,7 @@ public class LoginActivity extends AppCompatActivity {
             checkEssentialPermissions();
         } catch (Exception e) {
             Log.e(TAG, "Erreur lors de l'initialisation de LoginActivity", e);
-            Toast.makeText(this, "Erreur lors de l'initialisation de l'application", Toast.LENGTH_LONG).show();
+            ToastManager.showShort("Erreur lors de l'initialisation de l'application");
             finish();
         }
     }
@@ -124,7 +124,7 @@ public class LoginActivity extends AppCompatActivity {
             showWait(false);
         } catch (Exception e) {
             Log.e(TAG, "Erreur dans onResume", e);
-            Toast.makeText(this, "Erreur dans onResume", Toast.LENGTH_LONG).show();
+            ToastManager.showShort("Erreur dans onResume");
             showWait(false);
         }
     }
@@ -141,7 +141,8 @@ public class LoginActivity extends AppCompatActivity {
                     mUserName.setText("");
                     mUserPwd.setText("");
 
-                    prefs.setMbr("new");
+                    preferencesManager.setMbrId("new");
+
                     openConexion();
                 } else {
                     openDeco();
@@ -149,7 +150,7 @@ public class LoginActivity extends AppCompatActivity {
             }
         } catch (Exception e) {
             Log.e(TAG, "Erreur dans onPostResume", e);
-            Toast.makeText(this, "Erreur dans onPostResume", Toast.LENGTH_LONG).show();
+            ToastManager.showShort("Erreur dans onPostResume");
         }
     }
 
@@ -165,7 +166,8 @@ public class LoginActivity extends AppCompatActivity {
                 if (grantResults.length > 0 && grantResults[0] != PackageManager.PERMISSION_GRANTED) {
                     String msg = getString(R.string.mess_bad_permission_internet);
                     Log.e(TAG, msg);
-                    Toast.makeText(LoginActivity.this, msg, Toast.LENGTH_LONG).show();
+                    ToastManager.showShort(msg);
+                    // TODO : Ajouter un delay
                     finish();
                     return;
                 }
@@ -174,12 +176,12 @@ public class LoginActivity extends AppCompatActivity {
                 if (grantResults.length > 1 && grantResults[1] != PackageManager.PERMISSION_GRANTED) {
                     String msg = getString(R.string.mess_bad_permission_write);
                     Log.e(TAG, msg);
-                    Toast.makeText(LoginActivity.this, msg, Toast.LENGTH_LONG).show();
+                    ToastManager.showShort(msg);
                 }
             }
         } catch (Exception e) {
             Log.e(TAG, "Erreur lors du traitement des résultats de permission", e);
-            Toast.makeText(LoginActivity.this, "Erreur lors du traitement des résultats de permission", Toast.LENGTH_LONG).show();
+            ToastManager.showShort("Erreur lors du traitement des résultats de permission");
         }
     }
 
@@ -220,7 +222,7 @@ public class LoginActivity extends AppCompatActivity {
             }
         } catch (Exception e) {
             Log.e(TAG, "Erreur lors du traitement de l'action: " + e.getMessage(), e);
-            Toast.makeText(this, "Erreur lors du traitement de l'action", Toast.LENGTH_SHORT).show();
+            ToastManager.showShort("Erreur lors du traitement de l'action");
         }
     }
 
@@ -236,14 +238,14 @@ public class LoginActivity extends AppCompatActivity {
             }
         } catch (Exception e) {
             Log.e(TAG, "Erreur lors de la vérification des permissions", e);
-            Toast.makeText(this, "Erreur lors de la vérification des permissions", Toast.LENGTH_LONG).show();
+            ToastManager.showShort("Erreur lors de la vérification des permissions");
         }
     }
 
     private void connectMbr() {
         if (isConnecting.getAndSet(true)) {
             Log.d(TAG, "Une tentative de connexion est déjà en cours");
-            Toast.makeText(this, "Une tentative de connexion est déjà en cours", Toast.LENGTH_SHORT).show();
+            ToastManager.showShort("Une tentative de connexion est déjà en cours");
             return;
         }
 
@@ -257,14 +259,14 @@ public class LoginActivity extends AppCompatActivity {
 
             if (userName.isEmpty() || password.isEmpty()) {
                 Log.d(TAG, "Erreur de connexion: champs vides");
-                Toast.makeText(this, R.string.mess_err_conex, Toast.LENGTH_LONG).show();
+                ToastManager.showShort(getString(R.string.mess_err_conex));
                 isConnecting.set(false);
                 return;
             }
 
             if (!mCheckBox.isChecked()) {
                 Log.d(TAG, "Erreur de connexion: non accepté RGPD");
-                Toast.makeText(this, R.string.mess_err_rgpd, Toast.LENGTH_LONG).show();
+                ToastManager.showShort(getString(R.string.mess_err_rgpd));
                 isConnecting.set(false);
                 return;
             }
@@ -273,7 +275,7 @@ public class LoginActivity extends AppCompatActivity {
 
             if (!AndyUtils.isNetworkAvailable(this)) {
                 Log.d(TAG, "Erreur de connexion: pas de connexion réseau");
-                Toast.makeText(this, R.string.mess_conextion_lost, Toast.LENGTH_LONG).show();
+                ToastManager.showShort(getString(R.string.mess_conextion_lost));
                 isConnecting.set(false);
                 return;
             }
@@ -303,7 +305,7 @@ public class LoginActivity extends AppCompatActivity {
                         if (result == null) {
                             runOnUiThread(() -> {
                                 Log.e(TAG, "Erreur de communication avec le serveur");
-                                Toast.makeText(LoginActivity.this, "Erreur de communication avec le serveur", Toast.LENGTH_SHORT).show();
+                                ToastManager.showShort("Erreur de communication avec le serveur");
                                 showWait(false);
                                 isConnecting.set(false);
                             });
@@ -316,7 +318,7 @@ public class LoginActivity extends AppCompatActivity {
                             String errorMessage = result.length() > 1 ? result.substring(1) : "Erreur de connexion";
                             runOnUiThread(() -> {
                                 Log.e(TAG, errorMessage);
-                                Toast.makeText(LoginActivity.this, errorMessage, Toast.LENGTH_SHORT).show();
+                                ToastManager.showShort(errorMessage);
                                 showWait(false);
                                 isConnecting.set(false);
                             });
@@ -324,7 +326,7 @@ public class LoginActivity extends AppCompatActivity {
                     } catch (Exception e) {
                         Log.e(TAG, "Erreur lors du traitement de la réponse", e);
                         runOnUiThread(() -> {
-                            Toast.makeText(LoginActivity.this, "Erreur lors du traitement de la réponse", Toast.LENGTH_SHORT).show();
+                            ToastManager.showShort("Erreur lors du traitement de la réponse");
                             showWait(false);
                             isConnecting.set(false);
                         });
@@ -332,7 +334,7 @@ public class LoginActivity extends AppCompatActivity {
                 }).exceptionally(ex -> {
                     Log.e(TAG, "Exception lors de la connexion", ex);
                     runOnUiThread(() -> {
-                        Toast.makeText(LoginActivity.this, getString(R.string.mess_timeout), Toast.LENGTH_SHORT).show();
+                        ToastManager.showShort(getString(R.string.mess_timeout));
                         showWait(false);
                         isConnecting.set(false);
                     });
@@ -340,18 +342,18 @@ public class LoginActivity extends AppCompatActivity {
                 });
             } catch (UnsupportedEncodingException e) {
                 Log.e(TAG, "Erreur d'encodage des paramètres", e);
-                Toast.makeText(this, "Erreur d'encodage des paramètres", Toast.LENGTH_SHORT).show();
+                ToastManager.showShort("Erreur d'encodage des paramètres");
                 showWait(false);
                 isConnecting.set(false);
             } catch (Exception e) {
                 Log.e(TAG, "Erreur lors de la connexion", e);
-                Toast.makeText(this, "Erreur lors de la tentative de connexion", Toast.LENGTH_SHORT).show();
+                ToastManager.showShort("Erreur lors de la tentative de connexion");
                 showWait(false);
                 isConnecting.set(false);
             }
         } catch (Exception e) {
             Log.e(TAG, "Erreur générale dans connectMbr", e);
-            Toast.makeText(this, "Erreur lors de la connexion", Toast.LENGTH_SHORT).show();
+            ToastManager.showShort("Erreur lors de la connexion");
             showWait(false);
             isConnecting.set(false);
         }
@@ -359,7 +361,7 @@ public class LoginActivity extends AppCompatActivity {
     private void deconectMbr() {
         if (isConnecting.getAndSet(true)) {
             Log.d(TAG, "Une opération est déjà en cours");
-            Toast.makeText(this, "Une opération est déjà en cours", Toast.LENGTH_SHORT).show();
+            ToastManager.showShort("Une opération est déjà en cours");
             return;
         }
 
@@ -385,7 +387,7 @@ public class LoginActivity extends AppCompatActivity {
                     if (result == null) {
                         runOnUiThread(() -> {
                             Log.e(TAG, "Erreur de communication avec le serveur");
-                            Toast.makeText(LoginActivity.this, "Erreur de communication avec le serveur", Toast.LENGTH_SHORT).show();
+                            ToastManager.showShort("Erreur de communication avec le serveur");
                             showWait(false);
                             isConnecting.set(false);
                         });
@@ -400,14 +402,14 @@ public class LoginActivity extends AppCompatActivity {
 
                     runOnUiThread(() -> {
                         Log.d(TAG, message);
-                        Toast.makeText(LoginActivity.this, message, Toast.LENGTH_SHORT).show();
+                        ToastManager.showShort(message);
                         finish();
                     });
                 } catch (Exception e) {
                     Log.e(TAG, "Erreur lors du traitement de la déconnexion", e);
                     resetUserPreferences();
                     runOnUiThread(() -> {
-                        Toast.makeText(LoginActivity.this, "Erreur lors de la déconnexion", Toast.LENGTH_SHORT).show();
+                        ToastManager.showShort("Erreur lors de la déconnexion");
                         finish();
                     });
                 }
@@ -415,7 +417,7 @@ public class LoginActivity extends AppCompatActivity {
                 Log.e(TAG, "Exception lors de la déconnexion", ex);
                 resetUserPreferences();
                 runOnUiThread(() -> {
-                    Toast.makeText(LoginActivity.this, getString(R.string.mess_timeout), Toast.LENGTH_SHORT).show();
+                    ToastManager.showShort(getString(R.string.mess_timeout));
                     finish();
                 });
                 return null;
@@ -423,7 +425,7 @@ public class LoginActivity extends AppCompatActivity {
         } catch (Exception e) {
             Log.e(TAG, "Erreur lors de la déconnexion", e);
             resetUserPreferences();
-            Toast.makeText(this, "Erreur lors de la déconnexion", Toast.LENGTH_SHORT).show();
+            ToastManager.showShort("Erreur lors de la déconnexion");
             showWait(false);
             isConnecting.set(false);
             finish();
@@ -441,19 +443,20 @@ public class LoginActivity extends AppCompatActivity {
             idMbr = "new";
             isFirst = true;
 
-            // Réinitialiser les préférences
-            prefs.setMbr("new");
-            prefs.setAgency("");
-            prefs.setGroup("");
-            prefs.setResidence("");
-
             // Effacer les informations enregistrées
             SharedPreferences.Editor editor = preferences.edit();
             editor.clear();
             editor.apply();
+
+            // Réinitialiser les préférences gérées par PreferencesManager
+            preferencesManager.setMbrId("new");
+            preferencesManager.setAdrMac("new");
+            preferencesManager.setAgency("");
+            preferencesManager.setGroup("");
+            preferencesManager.setResidence("");
         } catch (Exception e) {
             Log.e(TAG, "Erreur lors de la réinitialisation des préférences", e);
-            Toast.makeText(this, "Erreur lors de la réinitialisation des préférences", Toast.LENGTH_SHORT).show();
+            ToastManager.showShort("Erreur lors de la réinitialisation des préférences");
         }
     }
 
@@ -464,7 +467,7 @@ public class LoginActivity extends AppCompatActivity {
             startActivity(intent);
         } catch (Exception e) {
             Log.e(TAG, "Erreur lors de la requête de connexion", e);
-            Toast.makeText(this, "Erreur lors de l'ouverture de l'écran de demande", Toast.LENGTH_SHORT).show();
+            ToastManager.showShort("Erreur lors de l'ouverture de l'écran de demande");
         }
     }
 
@@ -475,7 +478,7 @@ public class LoginActivity extends AppCompatActivity {
             startActivity(intent);
         } catch (Exception e) {
             Log.e(TAG, "Erreur lors de l'ouverture de la page web", e);
-            Toast.makeText(this, "Impossible d'ouvrir la page web", Toast.LENGTH_SHORT).show();
+            ToastManager.showShort("Impossible d'ouvrir la page web");
         }
     }
 
@@ -484,7 +487,7 @@ public class LoginActivity extends AppCompatActivity {
             if (result == null || result.isEmpty()) {
                 Log.e(TAG, "Réponse vide du serveur");
                 runOnUiThread(() -> {
-                    Toast.makeText(LoginActivity.this, "Réponse invalide du serveur", Toast.LENGTH_SHORT).show();
+                    ToastManager.showShort("Réponse invalide du serveur");
                     showWait(false);
                     isConnecting.set(false);
                 });
@@ -496,7 +499,7 @@ public class LoginActivity extends AppCompatActivity {
             if (tokenizer.countTokens() < 5) {
                 Log.e(TAG, "Réponse incomplète du serveur: " + result);
                 runOnUiThread(() -> {
-                    Toast.makeText(LoginActivity.this, "Réponse incomplète du serveur", Toast.LENGTH_SHORT).show();
+                    ToastManager.showShort("Réponse incomplète du serveur");
                     showWait(false);
                     isConnecting.set(false);
                 });
@@ -511,10 +514,11 @@ public class LoginActivity extends AppCompatActivity {
                 id_client = tokenizer.nextToken();
                 isFirst = false;
 
-                // Enregistrer les informations
-                prefs.setMbr(idMbr);
-                prefs.setAdrMac(adrMac);
+                // Enregistrer les informations de l'utilisateur
+                preferencesManager.setMbrId(idMbr);
+                preferencesManager.setAdrMac(adrMac);
 
+                // Conserver les identifiants pour la reconnexion
                 SharedPreferences.Editor editor = preferences.edit();
                 editor.putString(PREF_KEY_MBR, userName);
                 editor.putString(PREF_KEY_PWD, password);
@@ -533,14 +537,14 @@ public class LoginActivity extends AppCompatActivity {
         } catch (NumberFormatException e) {
             Log.e(TAG, "Format de version invalide", e);
             runOnUiThread(() -> {
-                Toast.makeText(LoginActivity.this, "Format de réponse invalide", Toast.LENGTH_SHORT).show();
+                ToastManager.showShort("Format de réponse invalide");
                 showWait(false);
                 isConnecting.set(false);
             });
         } catch (Exception e) {
             Log.e(TAG, "Erreur lors du démarrage de l'application", e);
             runOnUiThread(() -> {
-                Toast.makeText(LoginActivity.this, "Erreur lors du démarrage de l'application", Toast.LENGTH_SHORT).show();
+                ToastManager.showShort("Erreur lors du démarrage de l'application");
                 showWait(false);
                 isConnecting.set(false);
             });
@@ -550,78 +554,65 @@ public class LoginActivity extends AppCompatActivity {
         try {
             if (!AndyUtils.isNetworkAvailable(this)) {
                 Log.d(TAG, "Aucune connexion réseau disponible");
-                Toast.makeText(this, R.string.mess_conextion_lost, Toast.LENGTH_LONG).show();
+                ToastManager.showShort(getString(R.string.mess_conextion_lost));
                 openConexion();
                 return;
             }
 
             showWait(true);
 
-            prefs.getMbr(new Prefs.Callback<String>() {
-                @Override
-                public void onResult(String mbr) {
-                    try {
-                        idMbr = mbr != null ? mbr : "new";
-                        adrMac = Build.FINGERPRINT;
+            idMbr = preferencesManager.getMbrId();
+            adrMac = Build.FINGERPRINT;
 
-                        String stringGet = "version=" + VERSION;
-                        String stringPost = "mbr=" + idMbr + "&mac=" + adrMac;
+            String stringGet = "version=" + VERSION;
+            String stringPost = "mbr=" + idMbr + "&mac=" + adrMac;
 
-                        HttpTask task = new HttpTask(LoginActivity.this);
-                        CompletableFuture<String> futureResult = task.executeHttpTask(
-                                HttpTask.HTTP_TASK_ACT_CONEX,
-                                HttpTask.HTTP_TASK_CBL_TEST,
-                                stringGet,
-                                stringPost);
+            HttpTask task = new HttpTask(LoginActivity.this);
+            CompletableFuture<String> futureResult = task.executeHttpTask(
+                    HttpTask.HTTP_TASK_ACT_CONEX,
+                    HttpTask.HTTP_TASK_CBL_TEST,
+                    stringGet,
+                    stringPost);
 
-                        futureResult.thenAccept(result -> {
-                            try {
-                                if (result != null && result.startsWith("1")) {
-                                    isConnecting.set(true);
-                                    startAppli(result.substring(1));
-                                } else {
-                                    if (result != null && !result.equals("0")) {
-                                        String errorMessage = result.substring(1);
-                                        runOnUiThread(() -> {
-                                            Toast.makeText(LoginActivity.this, errorMessage, Toast.LENGTH_SHORT).show();
-                                        });
-                                    }
-                                    runOnUiThread(() -> {
-                                        openConexion();
-                                        showWait(false);
-                                    });
-                                }
-                            } catch (Exception e) {
-                                Log.e(TAG, "Erreur lors du traitement du résultat de testIdentified", e);
-                                runOnUiThread(() -> {
-                                    Toast.makeText(LoginActivity.this, "Erreur lors du traitement du résultat de testIdentified", Toast.LENGTH_SHORT).show();
-                                    openConexion();
-                                    showWait(false);
-                                });
-                            }
-                        }).exceptionally(ex -> {
-                            Log.e(TAG, "Exception lors de testIdentified", ex);
+            futureResult.thenAccept(result -> {
+                try {
+                    if (result != null && result.startsWith("1")) {
+                        isConnecting.set(true);
+                        startAppli(result.substring(1));
+                    } else {
+                        if (result != null && !result.equals("0")) {
+                            String errorMessage = result.substring(1);
+                            Log.e(TAG, errorMessage);
                             runOnUiThread(() -> {
-                                Toast.makeText(LoginActivity.this, getString(R.string.mess_timeout), Toast.LENGTH_SHORT).show();
-                                openConexion();
-                                showWait(false);
+                                ToastManager.showShort(errorMessage);
                             });
-                            return null;
-                        });
-                    } catch (Exception e) {
-                        Log.e(TAG, "Erreur dans onResult de getMbr", e);
+                        }
                         runOnUiThread(() -> {
-                            Toast.makeText(LoginActivity.this, "Erreur dans onResult de getMbr", Toast.LENGTH_SHORT).show();
                             openConexion();
                             showWait(false);
                         });
                     }
+                } catch (Exception e) {
+                    Log.e(TAG, "Erreur lors du traitement du résultat de testIdentified", e);
+                    runOnUiThread(() -> {
+                        ToastManager.showShort("Erreur lors du traitement du résultat de testIdentified");
+                        openConexion();
+                        showWait(false);
+                    });
                 }
+            }).exceptionally(ex -> {
+                Log.e(TAG, "Exception lors de testIdentified", ex);
+                runOnUiThread(() -> {
+                    ToastManager.showShort(getString(R.string.mess_timeout));
+                    openConexion();
+                    showWait(false);
+                });
+                return null;
             });
         } catch (Exception e) {
             Log.e(TAG, "Erreur dans testIdentified", e);
             runOnUiThread(() -> {
-                Toast.makeText(LoginActivity.this, "Erreur dans testIdentified", Toast.LENGTH_SHORT).show();
+                ToastManager.showShort("Erreur dans testIdentified");
                 openConexion();
                 showWait(false);
             });
@@ -647,7 +638,7 @@ public class LoginActivity extends AppCompatActivity {
             mLayoutConnect.setVisibility(View.VISIBLE);
         } catch (Exception e) {
             Log.e(TAG, "Erreur dans openConexion", e);
-            Toast.makeText(this, "Erreur dans openConexion", Toast.LENGTH_SHORT).show();
+            ToastManager.showShort("Erreur dans openConexion");
         }
     }
     private void openDeco() {
@@ -661,7 +652,7 @@ public class LoginActivity extends AppCompatActivity {
             mLayoutDeco.setVisibility(View.VISIBLE);
         } catch (Exception e) {
             Log.e(TAG, "Erreur dans openDeco", e);
-            Toast.makeText(this, "Erreur dans openDeco", Toast.LENGTH_SHORT).show();
+            ToastManager.showShort("Erreur dans openDeco");
         }
     }
     private void openVersion() {
@@ -677,7 +668,7 @@ public class LoginActivity extends AppCompatActivity {
             isConnecting.set(false);
         } catch (Exception e) {
             Log.e(TAG, "Erreur dans openVersion", e);
-            Toast.makeText(this, "Erreur dans openVersion", Toast.LENGTH_SHORT).show();
+            ToastManager.showShort("Erreur dans openVersion");
         }
     }
 
@@ -688,7 +679,7 @@ public class LoginActivity extends AppCompatActivity {
             runOnUiThread(() -> mWaitImg.setVisibility(b ? View.VISIBLE : View.INVISIBLE));
         } catch (Exception e) {
             Log.e(TAG, "Erreur dans showWait", e);
-            Toast.makeText(this, "Erreur dans showWait", Toast.LENGTH_SHORT).show();
+            ToastManager.showShort("Erreur dans showWait");
         }
     }
 
@@ -703,7 +694,7 @@ public class LoginActivity extends AppCompatActivity {
             }
         } catch (Exception e) {
             Log.e(TAG, "Erreur lors de la fermeture du clavier", e);
-            Toast.makeText(this, "Erreur lors de la fermeture du clavier", Toast.LENGTH_SHORT).show();
+            ToastManager.showShort("Erreur lors de la fermeture du clavier");
         }
     }
 
