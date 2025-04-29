@@ -2,27 +2,34 @@ package org.orgaprop.controlprest.controllers.activities;
 
 import static org.orgaprop.controlprest.controllers.activities.SelectActivity.SELECT_ACTIVITY_RESULT;
 
-import androidx.appcompat.app.AppCompatActivity;
-import androidx.appcompat.content.res.AppCompatResources;
-
 import android.content.Intent;
+import android.os.Build;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.widget.LinearLayout;
 import android.widget.TextView;
-import android.widget.Toast;
 
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.content.res.AppCompatResources;
+
+import java.util.ArrayList;
+
+import com.google.firebase.analytics.FirebaseAnalytics;
+import com.google.firebase.crashlytics.FirebaseCrashlytics;
+
+import org.orgaprop.controlprest.BuildConfig;
 import org.orgaprop.controlprest.R;
 import org.orgaprop.controlprest.databinding.ActivityMakeSelectBinding;
 import org.orgaprop.controlprest.models.ListResidModel;
-
-import java.util.ArrayList;
+import org.orgaprop.controlprest.utils.ToastManager;
 
 public class MakeSelectActivity extends AppCompatActivity {
 
     private static final String TAG = "MakeSelectActivity";
+    private FirebaseCrashlytics crashlytics;
+    private FirebaseAnalytics analytics;
 
 //********** STATIC VARIABLES
 
@@ -48,32 +55,77 @@ public class MakeSelectActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
 
         try {
-            binding = ActivityMakeSelectBinding.inflate(getLayoutInflater());
+            crashlytics = FirebaseCrashlytics.getInstance();
+            crashlytics.setCustomKey("deviceModel", Build.MODEL);
+            crashlytics.setCustomKey("deviceManufacturer", Build.MANUFACTURER);
+            crashlytics.setCustomKey("appVersion", BuildConfig.VERSION_NAME);
+            crashlytics.log("MakeSelectActivity démarrée");
 
+            analytics = FirebaseAnalytics.getInstance(this);
+
+            Bundle screenViewParams = new Bundle();
+            screenViewParams.putString(FirebaseAnalytics.Param.SCREEN_NAME, "MakeSelect");
+            screenViewParams.putString(FirebaseAnalytics.Param.SCREEN_CLASS, "MakeSelectActivity");
+            analytics.logEvent(FirebaseAnalytics.Event.SCREEN_VIEW, screenViewParams);
+
+            binding = ActivityMakeSelectBinding.inflate(getLayoutInflater());
             setContentView(binding.getRoot());
 
             Intent intent = getIntent();
 
             if (intent == null) {
+                crashlytics.log("Intent reçu est null");
                 Log.e(TAG, "Intent reçu est null");
-                showErrorAndFinish("Données d'entrée invalides");
+
+                Bundle errorParams = new Bundle();
+                errorParams.putString("error_type", "null_intent");
+                errorParams.putString("class", "MakeSelectActivity");
+                analytics.logEvent("onCreate_intent", errorParams);
+
+                showErrorAndFinish(getString(R.string.donn_es_d_entr_e_invalides));
                 return;
             }
 
             int typeSelect = intent.getIntExtra(MAKE_SELECT_ACTIVITY_TYPE, 0);
 
             if (typeSelect == 0) {
+                crashlytics.log("Type de sélection invalide (0)");
                 Log.e(TAG, "Type de sélection invalide (0)");
-                showErrorAndFinish("Type de sélection invalide");
+
+                Bundle errorParams = new Bundle();
+                errorParams.putString("error_type", "invalid_type");
+                errorParams.putString("class", "MakeSelectActivity");
+                errorParams.putString("typeSelect", String.valueOf(typeSelect));
+                analytics.logEvent("onCreate_type_select", errorParams);
+
+                showErrorAndFinish(getString(R.string.type_de_s_lection_invalide));
                 return;
             }
+
+            crashlytics.setCustomKey("selectionType", typeSelect);
+            crashlytics.log("Type de sélection: " + typeSelect);
+
+            Bundle typeParams = new Bundle();
+            typeParams.putString("class", "MakeSelectActivity");
+            typeParams.putString("selection_type", String.valueOf(typeSelect));
+            analytics.logEvent("onCreate_selection_type", typeParams);
 
             // Charger les données selon le type de sélection
             loadDataBasedOnType(typeSelect);
 
         } catch (Exception e) {
+            if (crashlytics != null) {
+                crashlytics.recordException(e);
+            }
             Log.e(TAG, "Erreur lors de l'initialisation de MakeSelectActivity", e);
-            showErrorAndFinish("Erreur lors de l'initialisation");
+
+            Bundle errorParams = new Bundle();
+            errorParams.putString("error_type", "init_error");
+            errorParams.putString("class", "MakeSelectActivity");
+            errorParams.putString("error_message", e.getMessage());
+            analytics.logEvent("onCreate_init_error", errorParams);
+
+            showErrorAndFinish(getString(R.string.erreur_lors_de_l_initialisation));
         }
     }
 
@@ -82,20 +134,44 @@ public class MakeSelectActivity extends AppCompatActivity {
     public void makeSelectActivityActions(View v) {
         try {
             if (v == null || v.getTag() == null) {
+                crashlytics.log("Vue ou tag null dans makeSelectActivityActions");
                 Log.e(TAG, "Vue ou tag null dans makeSelectActivityActions");
+
+                Bundle errorParams = new Bundle();
+                errorParams.putString("error_type", "null_view");
+                errorParams.putString("class", "MakeSelectActivity");
+                analytics.logEvent("makeSelectActivityActions_null_view", errorParams);
+
                 return;
             }
 
             String viewTag = v.getTag().toString();
+            crashlytics.setCustomKey("action", viewTag);
 
             if (viewTag.equals("cancel")) {
+                crashlytics.log("Action annulée par l'utilisateur");
                 finishActivity();
             } else {
+                crashlytics.log("Action non reconnue: " + viewTag);
                 Log.w(TAG, "Tag non reconnu: " + viewTag);
+
+                Bundle errorParams = new Bundle();
+                errorParams.putString("error_type", "unknown_action");
+                errorParams.putString("class", "MakeSelectActivity");
+                errorParams.putString("action", viewTag);
+                analytics.logEvent("makeSelectActivityActions_unknown_action", errorParams);
             }
         } catch (Exception e) {
+            crashlytics.recordException(e);
             Log.e(TAG, "Erreur lors du traitement de l'action", e);
-            Toast.makeText(this, "Erreur lors du traitement de l'action", Toast.LENGTH_SHORT).show();
+
+            Bundle errorParams = new Bundle();
+            errorParams.putString("error_type", "action_error");
+            errorParams.putString("class", "MakeSelectActivity");
+            errorParams.putString("error_message", e.getMessage());
+            analytics.logEvent("makeSelectActivityActions_app_error", errorParams);
+
+            ToastManager.showError(getString(R.string.erreur_lors_du_traitement_de_l_action));
         }
     }
 
@@ -106,6 +182,8 @@ public class MakeSelectActivity extends AppCompatActivity {
      */
     private void loadDataBasedOnType(int typeSelect) {
         try {
+            crashlytics.log("loadDataBasedOnType called");
+
             switch (typeSelect) {
                 case MAKE_SELECT_ACTIVITY_AGC:
                     loadAgencies();
@@ -117,12 +195,28 @@ public class MakeSelectActivity extends AppCompatActivity {
                     loadResidences();
                     break;
                 default:
+                    crashlytics.log("Type de sélection inconnu: " + typeSelect);
                     Log.e(TAG, "Type de sélection inconnu: " + typeSelect);
-                    showErrorAndFinish("Type de sélection inconnu");
+
+                    Bundle errorParams = new Bundle();
+                    errorParams.putString("error_type", "unknown_type");
+                    errorParams.putString("class", "MakeSelectActivity");
+                    errorParams.putString("typeSelect", String.valueOf(typeSelect));
+                    analytics.logEvent("loadDataBasedOnType_unknown_type", errorParams);
+
+                    showErrorAndFinish(getString(R.string.type_de_s_lection_inconnu));
                     break;
             }
         } catch (Exception e) {
+            crashlytics.recordException(e);
             Log.e(TAG, "Erreur lors du chargement des données", e);
+
+            Bundle errorParams = new Bundle();
+            errorParams.putString("error_type", "load_data_error");
+            errorParams.putString("class", "MakeSelectActivity");
+            errorParams.putString("error_message", e.getMessage());
+            analytics.logEvent("loadDataBasedOnType_app_error", errorParams);
+
             showErrorAndFinish("Erreur lors du chargement des données");
         }
     }
@@ -132,6 +226,8 @@ public class MakeSelectActivity extends AppCompatActivity {
      */
     private void loadAgencies() {
         try {
+            crashlytics.log("loadAgencies called");
+
             TextView mTitle = binding.makeSelectActivityTitle;
             LinearLayout mLayout = binding.makeSelectActivityLyt;
 
@@ -139,16 +235,34 @@ public class MakeSelectActivity extends AppCompatActivity {
             ArrayList<String> idAgcs = SelectActivity.idAgcs;
 
             if (nameAgcs.isEmpty() || idAgcs.isEmpty()) {
+                crashlytics.log("Listes d'agences vides");
                 Log.w(TAG, "Listes d'agences vides");
-                Toast.makeText(this, "Aucune agence disponible", Toast.LENGTH_SHORT).show();
+
+                Bundle errorParams = new Bundle();
+                errorParams.putString("error_type", "empty_list");
+                errorParams.putString("class", "MakeSelectActivity");
+                analytics.logEvent("loadAgencies_empty_list", errorParams);
+
+                ToastManager.showShort(getString(R.string.aucune_agence_disponible));
                 finishActivity();
                 return;
             }
 
+            crashlytics.setCustomKey("agenciesCount", nameAgcs.size());
+
             if (nameAgcs.size() != idAgcs.size()) {
+                crashlytics.log("Incohérence entre les tailles des listes d'agences: " +
+                        nameAgcs.size() + " vs " + idAgcs.size());
                 Log.e(TAG, "Incohérence entre les tailles des listes d'agences: " +
                         nameAgcs.size() + " vs " + idAgcs.size());
-                showErrorAndFinish("Incohérence dans les données d'agences");
+
+                Bundle errorParams = new Bundle();
+                errorParams.putString("error_type", "exec_error");
+                errorParams.putString("class", "MakeSelectActivity");
+                errorParams.putString("error_message", nameAgcs.size() + " vs " + idAgcs.size());
+                analytics.logEvent("loadAgencies_agencies_error", errorParams);
+
+                showErrorAndFinish(getString(R.string.incoh_rence_dans_les_donn_es_d_agences));
                 return;
             }
 
@@ -162,16 +276,30 @@ public class MakeSelectActivity extends AppCompatActivity {
                     View viewElement = LayoutInflater.from(this).inflate(R.layout.agence_item, null);
 
                     if (viewElement == null) {
+                        crashlytics.log("Échec de l'inflation de la vue d'agence");
                         Log.e(TAG, "Échec de l'inflation de la vue d'agence");
-                        Toast.makeText(this, "Échec de l'inflation de la vue d'agence", Toast.LENGTH_SHORT).show();
+
+                        Bundle errorParams = new Bundle();
+                        errorParams.putString("error_type", "inflate_error");
+                        errorParams.putString("class", "MakeSelectActivity");
+                        analytics.logEvent("loadAgencies_inflate_error", errorParams);
+
+                        ToastManager.showError(getString(R.string.chec_de_l_inflation_de_la_vue_d_agence));
                         continue;
                     }
 
                     TextView textView = viewElement.findViewById(R.id.agence_item_name);
 
                     if (textView == null) {
+                        crashlytics.log("TextView non trouvé dans la vue d'agence");
                         Log.e(TAG, "TextView non trouvé dans la vue d'agence");
-                        Toast.makeText(this, "TextView non trouvé dans la vue d'agence", Toast.LENGTH_SHORT).show();
+
+                        Bundle errorParams = new Bundle();
+                        errorParams.putString("error_type", "textview_not_found");
+                        errorParams.putString("class", "MakeSelectActivity");
+                        analytics.logEvent("loadAgencies_textview_not_found", errorParams);
+
+                        ToastManager.showError(getString(R.string.textview_non_trouv_dans_la_vue_d_agence));
                         continue;
                     }
 
@@ -188,10 +316,26 @@ public class MakeSelectActivity extends AppCompatActivity {
                     textView.setOnClickListener(view -> {
                         try {
                             if (view.getTag() == null) {
+                                crashlytics.log("Tag null lors du clic sur une agence");
                                 Log.e(TAG, "Tag null lors du clic sur une agence");
-                                Toast.makeText(this, "Tag null lors du clic sur une agence", Toast.LENGTH_SHORT).show();
+
+                                Bundle errorParams = new Bundle();
+                                errorParams.putString("error_type", "tag_null");
+                                errorParams.putString("class", "MakeSelectActivity");
+                                analytics.logEvent("loadAgencies_click_agency", errorParams);
+
+                                ToastManager.showError(getString(R.string.tag_null_lors_du_clic_sur_une_agence));
                                 return;
                             }
+
+                            String agencyId = view.getTag().toString();
+
+                            crashlytics.log("Agence sélectionnée: " + agencyId);
+
+                            Bundle errorParams = new Bundle();
+                            errorParams.putString("class", "MakeSelectActivity");
+                            errorParams.putString("agencyId", agencyId);
+                            analytics.logEvent("loadAgencies_click_agency", errorParams);
 
                             Intent resultIntent = new Intent();
                             resultIntent.putExtra(SELECT_ACTIVITY_RESULT, MAKE_SELECT_ACTIVITY_REQUEST);
@@ -201,8 +345,16 @@ public class MakeSelectActivity extends AppCompatActivity {
                             setResult(RESULT_OK, resultIntent);
                             finish();
                         } catch (Exception e) {
+                            crashlytics.recordException(e);
                             Log.e(TAG, "Erreur lors du traitement du clic sur l'agence", e);
-                            Toast.makeText(MakeSelectActivity.this, "Erreur lors de la sélection", Toast.LENGTH_SHORT).show();
+
+                            Bundle errorParams = new Bundle();
+                            errorParams.putString("error_type", "click_error");
+                            errorParams.putString("class", "MakeSelectActivity");
+                            errorParams.putString("error_message", e.getMessage());
+                            analytics.logEvent("loadAgencies_click_error", errorParams);
+
+                            ToastManager.showError(getString(R.string.erreur_lors_de_la_s_lection));
                         }
                     });
 
@@ -210,19 +362,42 @@ public class MakeSelectActivity extends AppCompatActivity {
                         try {
                             mLayout.addView(viewElement, layoutParams);
                         } catch (Exception e) {
+                            crashlytics.recordException(e);
                             Log.e(TAG, "Erreur lors de l'ajout de la vue d'agence au layout", e);
-                            Toast.makeText(MakeSelectActivity.this, "Erreur lors de l'ajout de la vue d'agence au layout", Toast.LENGTH_SHORT).show();
+
+                            Bundle errorParams = new Bundle();
+                            errorParams.putString("error_type", "add_view_error");
+                            errorParams.putString("class", "MakeSelectActivity");
+                            errorParams.putString("error_message", e.getMessage());
+                            analytics.logEvent("loadAgencies_add_view_error", errorParams);
+
+                            ToastManager.showError(getString(R.string.erreur_lors_de_l_ajout_de_la_vue_d_agence_au_layout));
                         }
                     });
                 } catch (Exception e) {
+                    crashlytics.recordException(e);
                     Log.e(TAG, "Erreur lors de la création de l'élément d'agence à la position " + i, e);
-                    Toast.makeText(MakeSelectActivity.this, "Erreur lors de la création de l'élément d'agence", Toast.LENGTH_SHORT).show();
+
+                    Bundle errorParams = new Bundle();
+                    errorParams.putString("error_type", "create_view_error");
+                    errorParams.putString("class", "MakeSelectActivity");
+                    errorParams.putString("error_message", e.getMessage());
+                    analytics.logEvent("loadAgencies_create_view_error", errorParams);
+
+                    ToastManager.showError(getString(R.string.erreur_lors_de_la_cr_ation_de_la_vue));
                 }
             }
         } catch (Exception e) {
+            crashlytics.recordException(e);
             Log.e(TAG, "Erreur générale lors du chargement des agences", e);
-            Toast.makeText(MakeSelectActivity.this, "Erreur générale lors du chargement des agences", Toast.LENGTH_SHORT).show();
-            showErrorAndFinish("Erreur lors du chargement des agences");
+
+            Bundle errorParams = new Bundle();
+            errorParams.putString("error_type", "load_agencies_error");
+            errorParams.putString("class", "MakeSelectActivity");
+            errorParams.putString("error_message", e.getMessage());
+            analytics.logEvent("loadAgencies_app_error", errorParams);
+
+            showErrorAndFinish(getString(R.string.erreur_lors_du_chargement_des_agences));
         }
     }
 
@@ -231,6 +406,8 @@ public class MakeSelectActivity extends AppCompatActivity {
      */
     private void loadGroups() {
         try {
+            crashlytics.log("loadGroups called");
+
             TextView mTitle = binding.makeSelectActivityTitle;
             LinearLayout mLayout = binding.makeSelectActivityLyt;
 
@@ -238,16 +415,34 @@ public class MakeSelectActivity extends AppCompatActivity {
             ArrayList<String> idGrps = SelectActivity.idGrps;
 
             if (nameGrps.isEmpty() || idGrps.isEmpty()) {
+                crashlytics.log("Listes de groupements vides");
                 Log.w(TAG, "Listes de groupements vides");
-                Toast.makeText(this, "Aucun groupement disponible", Toast.LENGTH_SHORT).show();
+
+                Bundle errorParams = new Bundle();
+                errorParams.putString("error_type", "empty_list");
+                errorParams.putString("class", "MakeSelectActivity");
+                analytics.logEvent("loadGroups_empty_list", errorParams);
+
+                ToastManager.showShort(getString(R.string.aucun_groupement_disponible));
                 finishActivity();
                 return;
             }
 
+            crashlytics.setCustomKey("groupsCount", nameGrps.size());
+
             if (nameGrps.size() != idGrps.size()) {
+                crashlytics.log("Incohérence entre les tailles des listes de groupements: " +
+                        nameGrps.size() + " vs " + idGrps.size());
                 Log.e(TAG, "Incohérence entre les tailles des listes de groupements: " +
                         nameGrps.size() + " vs " + idGrps.size());
-                showErrorAndFinish("Incohérence dans les données de groupements");
+
+                Bundle errorParams = new Bundle();
+                errorParams.putString("error_type", "exec_error");
+                errorParams.putString("class", "MakeSelectActivity");
+                errorParams.putString("error_message", nameGrps.size() + " vs " + idGrps.size());
+                analytics.logEvent("loadGroups_groups_error", errorParams);
+
+                showErrorAndFinish(getString(R.string.incoh_rence_dans_les_donn_es_de_groupements));
                 return;
             }
 
@@ -261,16 +456,30 @@ public class MakeSelectActivity extends AppCompatActivity {
                     View viewElement = LayoutInflater.from(this).inflate(R.layout.group_item, null);
 
                     if (viewElement == null) {
+                        crashlytics.log("Incohérence entre les tailles des listes de groupements");
                         Log.e(TAG, "Échec de l'inflation de la vue de groupement");
-                        Toast.makeText(this, "Échec de l'inflation de la vue de groupement", Toast.LENGTH_SHORT).show();
+
+                        Bundle errorParams = new Bundle();
+                        errorParams.putString("error_type", "inflate_error");
+                        errorParams.putString("class", "MakeSelectActivity");
+                        analytics.logEvent("loadGroups_inflate_error", errorParams);
+
+                        ToastManager.showError(getString(R.string.chec_de_la_construction_de_la_vue_de_groupement));
                         continue;
                     }
 
                     TextView textView = viewElement.findViewById(R.id.group_item_nom);
 
                     if (textView == null) {
+                        crashlytics.log("TextView non trouvé dans la vue de groupement");
                         Log.e(TAG, "TextView non trouvé dans la vue de groupement");
-                        Toast.makeText(this, "TextView non trouvé dans la vue de groupement", Toast.LENGTH_SHORT).show();
+
+                        Bundle errorParams = new Bundle();
+                        errorParams.putString("error_type", "textview_not_found");
+                        errorParams.putString("class", "MakeSelectActivity");
+                        analytics.logEvent("loadGroups_textview_not_found", errorParams);
+
+                        ToastManager.showError(getString(R.string.chec_de_la_construction_de_la_vue_de_groupement));
                         continue;
                     }
 
@@ -287,10 +496,19 @@ public class MakeSelectActivity extends AppCompatActivity {
                     textView.setOnClickListener(view -> {
                         try {
                             if (view.getTag() == null) {
+                                crashlytics.log("Tag null lors du clic sur un groupement");
                                 Log.e(TAG, "Tag null lors du clic sur un groupement");
-                                Toast.makeText(this, "Tag null lors du clic sur un groupement", Toast.LENGTH_SHORT).show();
+                                ToastManager.showError(getString(R.string.tag_null_lors_du_clic_sur_un_groupement));
                                 return;
                             }
+
+                            String groupId = view.getTag().toString();
+                            crashlytics.log("Groupement sélectionné: " + groupId);
+
+                            Bundle errorParams = new Bundle();
+                            errorParams.putString("class", "MakeSelectActivity");
+                            errorParams.putString("groupId", groupId);
+                            analytics.logEvent("loadGroups_click_group", errorParams);
 
                             Intent resultIntent = new Intent();
                             resultIntent.putExtra(SELECT_ACTIVITY_RESULT, MAKE_SELECT_ACTIVITY_REQUEST);
@@ -300,8 +518,16 @@ public class MakeSelectActivity extends AppCompatActivity {
                             setResult(RESULT_OK, resultIntent);
                             finish();
                         } catch (Exception e) {
+                            crashlytics.recordException(e);
                             Log.e(TAG, "Erreur lors du traitement du clic sur le groupement", e);
-                            Toast.makeText(MakeSelectActivity.this, "Erreur lors de la sélection", Toast.LENGTH_SHORT).show();
+
+                            Bundle errorParams = new Bundle();
+                            errorParams.putString("error_type", "click_error");
+                            errorParams.putString("class", "MakeSelectActivity");
+                            errorParams.putString("error_message", e.getMessage());
+                            analytics.logEvent("loadGroups_click_error", errorParams);
+
+                            ToastManager.showError(getString(R.string.erreur_lors_de_la_s_lection));
                         }
                     });
 
@@ -309,18 +535,42 @@ public class MakeSelectActivity extends AppCompatActivity {
                         try {
                             mLayout.addView(viewElement, layoutParams);
                         } catch (Exception e) {
+                            crashlytics.recordException(e);
                             Log.e(TAG, "Erreur lors de l'ajout de la vue de groupement au layout", e);
-                            Toast.makeText(MakeSelectActivity.this, "Erreur lors de l'ajout de la vue de groupement au layout", Toast.LENGTH_SHORT).show();
+
+                            Bundle errorParams = new Bundle();
+                            errorParams.putString("error_type", "add_view_error");
+                            errorParams.putString("class", "MakeSelectActivity");
+                            errorParams.putString("error_message", e.getMessage());
+                            analytics.logEvent("loadGroups_add_view_error", errorParams);
+
+                            ToastManager.showError(getString(R.string.chec_de_la_construction_de_la_vue_de_groupement));
                         }
                     });
                 } catch (Exception e) {
+                    crashlytics.recordException(e);
                     Log.e(TAG, "Erreur lors de la création de l'élément de groupement à la position " + i, e);
-                    Toast.makeText(MakeSelectActivity.this, "Erreur lors de la création de l'élément de groupement", Toast.LENGTH_SHORT).show();
+
+                    Bundle errorParams = new Bundle();
+                    errorParams.putString("error_type", "create_view_error");
+                    errorParams.putString("class", "MakeSelectActivity");
+                    errorParams.putString("error_message", e.getMessage());
+                    analytics.logEvent("loadGroups_create_view_error", errorParams);
+
+                    ToastManager.showError(getString(R.string.chec_de_la_construction_de_la_vue_de_groupement));
                 }
             }
         } catch (Exception e) {
+            crashlytics.recordException(e);
             Log.e(TAG, "Erreur générale lors du chargement des groupements", e);
-            showErrorAndFinish("Erreur lors du chargement des groupements");
+
+            Bundle errorParams = new Bundle();
+            errorParams.putString("error_type", "load_groups_error");
+            errorParams.putString("class", "MakeSelectActivity");
+            errorParams.putString("error_message", e.getMessage());
+            analytics.logEvent("loadGroups_app_error", errorParams);
+
+            showErrorAndFinish(getString(R.string.erreur_lors_du_chargement_des_groupements));
         }
     }
 
@@ -329,6 +579,8 @@ public class MakeSelectActivity extends AppCompatActivity {
      */
     private void loadResidences() {
         try {
+            crashlytics.log("loadResidences called");
+
             TextView mTitle = binding.makeSelectActivityTitle;
             LinearLayout mLayout = binding.makeSelectActivityLyt;
 
@@ -336,16 +588,32 @@ public class MakeSelectActivity extends AppCompatActivity {
             ArrayList<String> idRsds = SelectActivity.idRsds;
 
             if (nameRsds.isEmpty() || idRsds.isEmpty()) {
+                crashlytics.log("Listes de résidences vides");
                 Log.w(TAG, "Listes de résidences vides");
-                Toast.makeText(this, "Aucune résidence disponible", Toast.LENGTH_SHORT).show();
+
+                Bundle errorParams = new Bundle();
+                errorParams.putString("error_type", "empty_list");
+                errorParams.putString("class", "MakeSelectActivity");
+                analytics.logEvent("loadResidences_empty_list", errorParams);
+
+                ToastManager.showError(getString(R.string.aucune_r_sidence_disponible));
                 finishActivity();
                 return;
             }
 
             if (nameRsds.size() != idRsds.size()) {
+                crashlytics.log("Incohérence entre les tailles des listes de résidences: " +
+                        nameRsds.size() + " vs " + idRsds.size());
                 Log.e(TAG, "Incohérence entre les tailles des listes de résidences: " +
                         nameRsds.size() + " vs " + idRsds.size());
-                showErrorAndFinish("Incohérence dans les données de résidences");
+
+                Bundle errorParams = new Bundle();
+                errorParams.putString("error_type", "exec_error");
+                errorParams.putString("class", "MakeSelectActivity");
+                errorParams.putString("error_message", nameRsds.size() + " vs " + idRsds.size());
+                analytics.logEvent("loadResidences_resid_error", errorParams);
+
+                showErrorAndFinish(getString(R.string.incoh_rence_dans_les_donn_es_de_r_sidences));
                 return;
             }
 
@@ -359,7 +627,14 @@ public class MakeSelectActivity extends AppCompatActivity {
                     View viewElement = LayoutInflater.from(this).inflate(R.layout.resid_item, null);
 
                     if (viewElement == null) {
+                        crashlytics.log("Échec de l'inflation de la vue de résidence");
                         Log.e(TAG, "Échec de l'inflation de la vue de résidence");
+
+                        Bundle errorParams = new Bundle();
+                        errorParams.putString("error_type", "inflate_error");
+                        errorParams.putString("class", "MakeSelectActivity");
+                        analytics.logEvent("loadResidences_inflate_error", errorParams);
+
                         continue;
                     }
 
@@ -376,8 +651,15 @@ public class MakeSelectActivity extends AppCompatActivity {
                     // Vérifier que tous les TextView sont valides
                     if (textViewRef == null || textViewName == null || textViewEntry == null ||
                             textViewAdr == null || textViewCity == null || textViewLast == null) {
+                        crashlytics.log("Un ou plusieurs TextView manquants dans la vue de résidence");
                         Log.e(TAG, "Un ou plusieurs TextView manquants dans la vue de résidence");
-                        Toast.makeText(this, "Un ou plusieurs TextView manquants dans la vue de résidence", Toast.LENGTH_SHORT).show();
+
+                        Bundle errorParams = new Bundle();
+                        errorParams.putString("error_type", "textview_missing");
+                        errorParams.putString("class", "MakeSelectActivity");
+                        analytics.logEvent("loadResidences_textview_missing", errorParams);
+
+                        ToastManager.showError(getString(R.string.un_ou_plusieurs_textview_manquants_dans_la_vue_de_r_sidence));
                         continue;
                     }
 
@@ -408,10 +690,19 @@ public class MakeSelectActivity extends AppCompatActivity {
                     viewElement.setOnClickListener(view -> {
                         try {
                             if (view.getTag() == null) {
+                                crashlytics.log("Tag null lors du clic sur une résidence");
                                 Log.e(TAG, "Tag null lors du clic sur une résidence");
-                                Toast.makeText(this, "Tag null lors du clic sur une résidence", Toast.LENGTH_SHORT).show();
+                                ToastManager.showError(getString(R.string.tag_null_lors_du_clic_sur_une_r_sidence));
                                 return;
                             }
+
+                            String residenceId = view.getTag().toString();
+                            crashlytics.log("Résidence sélectionnée: " + residenceId);
+
+                            Bundle errorParams = new Bundle();
+                            errorParams.putString("class", "MakeSelectActivity");
+                            errorParams.putString("residenceId", residenceId);
+                            analytics.logEvent("loadResidences_click_residence", errorParams);
 
                             Intent resultIntent = new Intent();
                             resultIntent.putExtra(SELECT_ACTIVITY_RESULT, MAKE_SELECT_ACTIVITY_REQUEST);
@@ -421,8 +712,16 @@ public class MakeSelectActivity extends AppCompatActivity {
                             setResult(RESULT_OK, resultIntent);
                             finish();
                         } catch (Exception e) {
+                            crashlytics.recordException(e);
                             Log.e(TAG, "Erreur lors du traitement du clic sur la résidence", e);
-                            Toast.makeText(MakeSelectActivity.this, "Erreur lors de la sélection", Toast.LENGTH_SHORT).show();
+
+                            Bundle errorParams = new Bundle();
+                            errorParams.putString("error_type", "click_error");
+                            errorParams.putString("class", "MakeSelectActivity");
+                            errorParams.putString("error_message", e.getMessage());
+                            analytics.logEvent("loadResidences_click_error", errorParams);
+
+                            ToastManager.showError(getString(R.string.erreur_lors_de_la_s_lection));
                         }
                     });
 
@@ -430,18 +729,42 @@ public class MakeSelectActivity extends AppCompatActivity {
                         try {
                             mLayout.addView(viewElement, layoutParams);
                         } catch (Exception e) {
+                            crashlytics.recordException(e);
                             Log.e(TAG, "Erreur lors de l'ajout de la vue de résidence au layout", e);
-                            Toast.makeText(MakeSelectActivity.this, "Erreur lors de l'ajout de la vue de résidence au layout", Toast.LENGTH_SHORT).show();
+
+                            Bundle errorParams = new Bundle();
+                            errorParams.putString("error_type", "add_view_error");
+                            errorParams.putString("class", "MakeSelectActivity");
+                            errorParams.putString("error_message", e.getMessage());
+                            analytics.logEvent("loadResidences_add_view_error", errorParams);
+
+                            ToastManager.showError(getString(R.string.erreur_lors_de_l_ajout_de_la_vue_de_r_sidence_au_layout));
                         }
                     });
                 } catch (Exception e) {
+                    crashlytics.recordException(e);
                     Log.e(TAG, "Erreur lors de la création de l'élément de résidence à la position " + i, e);
-                    Toast.makeText(MakeSelectActivity.this, "Erreur lors de la création de l'élément de résidence", Toast.LENGTH_SHORT).show();
+
+                    Bundle errorParams = new Bundle();
+                    errorParams.putString("error_type", "create_view_error");
+                    errorParams.putString("class", "MakeSelectActivity");
+                    errorParams.putString("error_message", e.getMessage());
+                    analytics.logEvent("loadResidences_create_view_error", errorParams);
+
+                    ToastManager.showError(getString(R.string.erreur_lors_de_la_cr_ation_de_l_l_ment_de_r_sidence));
                 }
             }
         } catch (Exception e) {
+            crashlytics.recordException(e);
             Log.e(TAG, "Erreur générale lors du chargement des résidences", e);
-            showErrorAndFinish("Erreur lors du chargement des résidences");
+
+            Bundle errorParams = new Bundle();
+            errorParams.putString("error_type", "load_residences_error");
+            errorParams.putString("class", "MakeSelectActivity");
+            errorParams.putString("error_message", e.getMessage());
+            analytics.logEvent("loadResidences_app_error", errorParams);
+
+            showErrorAndFinish(getString(R.string.erreur_lors_du_chargement_des_r_sidences));
         }
     }
 
@@ -450,11 +773,20 @@ public class MakeSelectActivity extends AppCompatActivity {
      */
     private void finishActivity() {
         try {
+            crashlytics.log("finishActivity called");
+
             setResult(MAKE_SELECT_ACTIVITY_REQUEST_CANCEL);
             finish();
         } catch (Exception e) {
+            crashlytics.recordException(e);
             Log.e(TAG, "Erreur lors de la fermeture de l'activité", e);
-            Toast.makeText(MakeSelectActivity.this, "Erreur lors de la fermeture de l'activité", Toast.LENGTH_SHORT).show();
+
+            Bundle errorParams = new Bundle();
+            errorParams.putString("error_type", "finish_error");
+            errorParams.putString("class", "MakeSelectActivity");
+            errorParams.putString("error_message", e.getMessage());
+            analytics.logEvent("finishActivity_error", errorParams);
+
             new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(this::finish, 3000);
         }
     }
@@ -464,12 +796,28 @@ public class MakeSelectActivity extends AppCompatActivity {
      */
     private void showErrorAndFinish(String message) {
         try {
-            Toast.makeText(this, message, Toast.LENGTH_LONG).show();
+            crashlytics.log("showErrorAndFinish called");
+
+            Bundle errorParams = new Bundle();
+            errorParams.putString("error_type", "show_error");
+            errorParams.putString("class", "MakeSelectActivity");
+            errorParams.putString("error_message", message);
+            analytics.logEvent("showErrorAndFinish_error", errorParams);
+
+            ToastManager.showError(message);
             Log.e(TAG, "Erreur fatale: " + message);
             new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(this::finishActivity, 3000);
         } catch (Exception e) {
+            crashlytics.recordException(e);
             Log.e(TAG, "Erreur lors de l'affichage de l'erreur", e);
-            Toast.makeText(MakeSelectActivity.this, "Erreur lors de l'affichage de l'erreur", Toast.LENGTH_SHORT).show();
+
+            Bundle errorParams = new Bundle();
+            errorParams.putString("error_type", "show_error");
+            errorParams.putString("class", "MakeSelectActivity");
+            errorParams.putString("error_message", message);
+            analytics.logEvent("showErrorAndFinish_error", errorParams);
+
+            ToastManager.showError(message);
             new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(this::finish, 3000);
         }
     }

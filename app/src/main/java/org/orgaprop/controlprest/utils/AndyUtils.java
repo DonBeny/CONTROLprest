@@ -14,7 +14,6 @@ import android.provider.MediaStore;
 import android.util.Base64;
 import android.util.Log;
 import android.util.Size;
-import android.widget.Toast;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -23,6 +22,8 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
+
+import com.google.firebase.crashlytics.FirebaseCrashlytics;
 
 public class AndyUtils {
 
@@ -54,24 +55,29 @@ public class AndyUtils {
                     boolean hasCellular = networkCapabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR);
 
                     boolean isAvailable = hasWifi || hasCellular;
+
+                    FirebaseCrashlytics.getInstance().log("Connectivité réseau - WiFi: " + hasWifi + ", Cellulaire: " + hasCellular);
                     Log.d(TAG, "État du réseau - WiFi: " + hasWifi + ", Cellulaire: " + hasCellular);
-                    Toast.makeText(context, "État du réseau - WiFi: " + hasWifi + ", Cellulaire: " + hasCellular, Toast.LENGTH_SHORT).show();
 
                     return isAvailable;
                 } else {
+                    FirebaseCrashlytics.getInstance().log("Aucune capacité réseau détectée");
                     Log.e(TAG, "Aucune capacité réseau détectée");
-                    Toast.makeText(context, "Aucune capacité réseau détectée", Toast.LENGTH_SHORT).show();
+                    ToastManager.showError("Aucune capacité réseau détectée");
                 }
             } else {
+                FirebaseCrashlytics.getInstance().log("ConnectivityManager est null");
                 Log.e(TAG, "ConnectivityManager est null");
-                Toast.makeText(context, "ConnectivityManager est null", Toast.LENGTH_SHORT).show();
+                ToastManager.showError("ConnectivityManager est null");
             }
         } catch (SecurityException e) {
+            FirebaseCrashlytics.getInstance().recordException(e);
             Log.e(TAG, "Permission ACCESS_NETWORK_STATE manquante", e);
-            Toast.makeText(context, "Permission ACCESS_NETWORK_STATE manquante", Toast.LENGTH_SHORT).show();
+            ToastManager.showError("Permission ACCESS_NETWORK_STATE manquante");
         } catch (Exception e) {
+            FirebaseCrashlytics.getInstance().recordException(e);
             Log.e(TAG, "Exception lors de la vérification du réseau", e);
-            Toast.makeText(context, "Exception lors de la vérification du réseau", Toast.LENGTH_SHORT).show();
+            ToastManager.showError("Exception lors de la vérification du réseau");
         }
 
         return false;
@@ -87,19 +93,19 @@ public class AndyUtils {
     public static String putBitmapToGallery(Context context, Bitmap bitmap, String imageName) {
         if (context == null) {
             Log.e(TAG, "Le contexte est null dans putBitmapToGallery");
-            Toast.makeText(context, "Le contexte est null dans putBitmapToGallery", Toast.LENGTH_SHORT).show();
+            ToastManager.showError("Le contexte est null dans putBitmapToGallery");
             return "";
         }
 
         if (bitmap == null) {
             Log.e(TAG, "Le bitmap est null dans putBitmapToGallery");
-            Toast.makeText(context, "Le bitmap est null dans putBitmapToGallery", Toast.LENGTH_SHORT).show();
+            ToastManager.showError("Le bitmap est null dans putBitmapToGallery");
             return "";
         }
 
         if (imageName == null || imageName.isEmpty()) {
             Log.e(TAG, "Le nom de l'image est null ou vide dans putBitmapToGallery");
-            Toast.makeText(context, "Le nom de l'image est null ou vide dans putBitmapToGallery", Toast.LENGTH_SHORT).show();
+            ToastManager.showError("Le nom de l'image est null ou vide dans putBitmapToGallery");
             imageName = "image_" + System.currentTimeMillis() + ".png";
         }
 
@@ -114,7 +120,7 @@ public class AndyUtils {
                     boolean dirCreated = fileDir.mkdirs();
                     if (!dirCreated) {
                         Log.e(TAG, "Impossible de créer le répertoire: " + imagesPath);
-                        Toast.makeText(context, "Impossible de créer le répertoire: " + imagesPath, Toast.LENGTH_SHORT).show();
+                        ToastManager.showError("Impossible de créer le répertoire: " + imagesPath);
                         return "";
                     }
                 }
@@ -126,7 +132,7 @@ public class AndyUtils {
                         boolean deleted = image.delete();
                         if (!deleted) {
                             Log.w(TAG, "Impossible de supprimer l'image existante: " + image.getAbsolutePath());
-                            Toast.makeText(context, "Impossible de supprimer l'image existante: " + image.getAbsolutePath(), Toast.LENGTH_SHORT).show();
+                            ToastManager.showError("Impossible de supprimer l'image existante: " + image.getAbsolutePath());
                         }
                     }
                 }
@@ -146,22 +152,22 @@ public class AndyUtils {
                         null,
                         (path, uri) -> {
                             Log.d(TAG, "Image scannée: " + path);
-                            Toast.makeText(context, "Image scannée: " + path, Toast.LENGTH_SHORT).show();
+                            ToastManager.showError("Image scannée: " + path);
                         }
                     );
                 } catch (NoSuchFileException e) {
                     Log.e(TAG, "Fichier introuvable pour l'écriture", e);
-                    Toast.makeText(context, "Fichier introuvable pour l'écriture", Toast.LENGTH_SHORT).show();
+                    ToastManager.showError("Fichier introuvable pour l'écriture");
                 } catch (IOException e) {
                     Log.e(TAG, "Erreur d'E/S lors de l'écriture du bitmap", e);
-                    Toast.makeText(context, "Erreur d'E/S lors de l'écriture du bitmap", Toast.LENGTH_SHORT).show();
+                    ToastManager.showError("Erreur d'E/S lors de l'écriture du bitmap");
                 } finally {
                     if (os != null) {
                         try {
                             os.close();
                         } catch (IOException e) {
                             Log.e(TAG, "Erreur lors de la fermeture du flux de sortie", e);
-                            Toast.makeText(context, "Erreur lors de la fermeture du flux de sortie", Toast.LENGTH_SHORT).show();
+                            ToastManager.showError("Erreur lors de la fermeture du flux de sortie");
                         }
                     }
                 }
@@ -192,7 +198,7 @@ public class AndyUtils {
                             result = uri.toString();
                         } else {
                             Log.e(TAG, "OutputStream est null après ouverture");
-                            Toast.makeText(context, "OutputStream est null après ouverture", Toast.LENGTH_SHORT).show();
+                            ToastManager.showError("OutputStream est null après ouverture");
                         }
                     } catch (FileNotFoundException e) {
                         Log.e(TAG, "Fichier non trouvé pour l'URI: " + uri, e);
@@ -207,15 +213,15 @@ public class AndyUtils {
                     }
                 } else {
                     Log.e(TAG, "Impossible de créer l'URI pour l'image");
-                    Toast.makeText(context, "Impossible de créer l'URI pour l'image", Toast.LENGTH_SHORT).show();
+                    ToastManager.showError("Impossible de créer l'URI pour l'image");
                 }
             }
         } catch (SecurityException e) {
             Log.e(TAG, "Permission de stockage manquante", e);
-            Toast.makeText(context, "Permission de stockage manquante", Toast.LENGTH_SHORT).show();
+            ToastManager.showError("Permission de stockage manquante");
         } catch (Exception e) {
             Log.e(TAG, "Exception lors de l'enregistrement du bitmap", e);
-            Toast.makeText(context, "Exception lors de l'enregistrement du bitmap", Toast.LENGTH_SHORT).show();
+            ToastManager.showError("Exception lors de l'enregistrement du bitmap");
         }
 
         return result;
@@ -231,19 +237,19 @@ public class AndyUtils {
     public static Bitmap getBitmapFromGallery(Context context, String imagePath, Size size) {
         if (context == null) {
             Log.e(TAG, "Le contexte est null dans getBitmapFromGallery");
-            Toast.makeText(context, "Le contexte est null dans getBitmapFromGallery", Toast.LENGTH_SHORT).show();
+            ToastManager.showError("Le contexte est null dans getBitmapFromGallery");
             return null;
         }
 
         if (imagePath == null || imagePath.isEmpty()) {
             Log.e(TAG, "Le chemin de l'image est null ou vide");
-            Toast.makeText(context, "Le chemin de l'image est null ou vide", Toast.LENGTH_SHORT).show();
+            ToastManager.showError("Le chemin de l'image est null ou vide");
             return null;
         }
 
         if (size == null) {
             Log.e(TAG, "La taille est null");
-            Toast.makeText(context, "La taille est null", Toast.LENGTH_SHORT).show();
+            ToastManager.showError("La taille est null");
             return null;
         }
 
@@ -254,7 +260,7 @@ public class AndyUtils {
                 File imageFile = new File(imagePath);
                 if (!imageFile.exists()) {
                     Log.e(TAG, "Le fichier n'existe pas: " + imagePath);
-                    Toast.makeText(context, "Le fichier n'existe pas: " + imagePath, Toast.LENGTH_SHORT).show();
+                    ToastManager.showError("Le fichier n'existe pas: " + imagePath);
                     return null;
                 }
 
@@ -280,16 +286,16 @@ public class AndyUtils {
             }
         } catch (FileNotFoundException e) {
             Log.e(TAG, "Fichier non trouvé: " + imagePath, e);
-            Toast.makeText(context, "Fichier non trouvé: " + imagePath, Toast.LENGTH_SHORT).show();
+            ToastManager.showError("Fichier non trouvé: " + imagePath);
         } catch (IOException e) {
             Log.e(TAG, "Erreur d'E/S lors du chargement du bitmap", e);
-            Toast.makeText(context, "Erreur d'E/S lors du chargement du bitmap", Toast.LENGTH_SHORT).show();
+            ToastManager.showError("Erreur d'E/S lors du chargement du bitmap");
         } catch (SecurityException e) {
             Log.e(TAG, "Permission manquante pour accéder à l'image", e);
-            Toast.makeText(context, "Permission manquante pour accéder à l'image", Toast.LENGTH_SHORT).show();
+            ToastManager.showError("Permission manquante pour accéder à l'image");
         } catch (Exception e) {
             Log.e(TAG, "Exception lors du chargement du bitmap", e);
-            Toast.makeText(context, "Exception lors du chargement du bitmap", Toast.LENGTH_SHORT).show();
+            ToastManager.showError("Exception lors du chargement du bitmap");
         }
 
         return bitmap;
@@ -303,7 +309,7 @@ public class AndyUtils {
     public static String bitmapToString(Context context, Bitmap bitmap) {
         if (bitmap == null) {
             Log.e(TAG, "Le bitmap est null dans bitmapToString");
-            Toast.makeText(context, "Le bitmap est null dans bitmapToString", Toast.LENGTH_SHORT).show();
+            ToastManager.showError("Le bitmap est null dans bitmapToString");
             return null;
         }
 
@@ -313,7 +319,7 @@ public class AndyUtils {
 
             if (!success) {
                 Log.e(TAG, "Échec de la compression du bitmap");
-                Toast.makeText(context, "Échec de la compression du bitmap", Toast.LENGTH_SHORT).show();
+                ToastManager.showError("Échec de la compression du bitmap");
                 return null;
             }
 
@@ -321,11 +327,11 @@ public class AndyUtils {
             return Base64.encodeToString(arr, Base64.DEFAULT);
         } catch (OutOfMemoryError e) {
             Log.e(TAG, "Mémoire insuffisante pour la conversion du bitmap", e);
-            Toast.makeText(context, "Mémoire insuffisante pour la conversion du bitmap", Toast.LENGTH_SHORT).show();
+            ToastManager.showError("Mémoire insuffisante pour la conversion du bitmap");
             return null;
         } catch (Exception e) {
             Log.e(TAG, "Exception lors de la conversion du bitmap en chaîne", e);
-            Toast.makeText(context, "Exception lors de la conversion du bitmap en chaîne", Toast.LENGTH_SHORT).show();
+            ToastManager.showError("Exception lors de la conversion du bitmap en chaîne");
             return null;
         }
     }
@@ -338,7 +344,7 @@ public class AndyUtils {
     public static Bitmap StringToBitMap(Context context, String image) {
         if (image == null || image.isEmpty()) {
             Log.e(TAG, "La chaîne image est null ou vide");
-            Toast.makeText(context, "La chaîne image est null ou vide", Toast.LENGTH_SHORT).show();
+            ToastManager.showError("La chaîne image est null ou vide");
             return null;
         }
 
@@ -347,15 +353,15 @@ public class AndyUtils {
             return BitmapFactory.decodeByteArray(encodeByte, 0, encodeByte.length);
         } catch (IllegalArgumentException e) {
             Log.e(TAG, "La chaîne ne contient pas de données Base64 valides", e);
-            Toast.makeText(context, "La chaîne ne contient pas de données Base64 valides", Toast.LENGTH_SHORT).show();
+            ToastManager.showError("La chaîne ne contient pas de données Base64 valides");
             return null;
         } catch (OutOfMemoryError e) {
             Log.e(TAG, "Mémoire insuffisante pour le décodage du bitmap", e);
-            Toast.makeText(context, "Mémoire insuffisante pour le décodage du bitmap", Toast.LENGTH_SHORT).show();
+            ToastManager.showError("Mémoire insuffisante pour le décodage du bitmap");
             return null;
         } catch (Exception e) {
             Log.e(TAG, "Exception lors de la conversion de la chaîne en bitmap", e);
-            Toast.makeText(context, "Exception lors de la conversion de la chaîne en bitmap", Toast.LENGTH_SHORT).show();
+            ToastManager.showError("Exception lors de la conversion de la chaîne en bitmap");
             return null;
         }
     }
@@ -368,7 +374,7 @@ public class AndyUtils {
     public static String getFolderPath(Context context) {
         if (context == null) {
             Log.e(TAG, "Le contexte est null dans getFolderPath");
-            Toast.makeText(context, "Le contexte est null dans getFolderPath", Toast.LENGTH_SHORT).show();
+            ToastManager.showError("Le contexte est null dans getFolderPath");
             return null;
         }
 
@@ -382,7 +388,7 @@ public class AndyUtils {
                     boolean created = sdPath.mkdirs();
                     if (!created) {
                         Log.e(TAG, "Impossible de créer le dossier dans le stockage externe: " + sdPath.getAbsolutePath());
-                        Toast.makeText(context, "Impossible de créer le dossier dans le stockage externe: " + sdPath.getAbsolutePath(), Toast.LENGTH_SHORT).show();
+                        ToastManager.showError("Impossible de créer le dossier dans le stockage externe: " + sdPath.getAbsolutePath());
                     }
                 }
 
@@ -394,7 +400,7 @@ public class AndyUtils {
                     boolean created = cacheDir.mkdirs();
                     if (!created) {
                         Log.e(TAG, "Impossible de créer le dossier dans le cache: " + cacheDir.getAbsolutePath());
-                        Toast.makeText(context, "Impossible de créer le dossier dans le cache: " + cacheDir.getAbsolutePath(), Toast.LENGTH_SHORT).show();
+                        ToastManager.showError("Impossible de créer le dossier dans le cache: " + cacheDir.getAbsolutePath());
                     }
                 }
 
@@ -402,10 +408,10 @@ public class AndyUtils {
             }
         } catch (SecurityException e) {
             Log.e(TAG, "Permissions insuffisantes pour le stockage", e);
-            Toast.makeText(context, "Permissions insuffisantes pour le stockage", Toast.LENGTH_SHORT).show();
+            ToastManager.showError("Permissions insuffisantes pour le stockage");
         } catch (Exception e) {
             Log.e(TAG, "Exception lors de la récupération du chemin du dossier", e);
-            Toast.makeText(context, "Exception lors de la récupération du chemin du dossier", Toast.LENGTH_SHORT).show();
+            ToastManager.showError("Exception lors de la récupération du chemin du dossier");
         }
 
         return folderPath;
@@ -416,7 +422,9 @@ public class AndyUtils {
      * @return true si une carte SD est disponible, false sinon
      */
     private static boolean isSdPresent() {
-        return Environment.getExternalStorageState().equals(Environment.MEDIA_MOUNTED);
+        boolean isPresent = Environment.getExternalStorageState().equals(Environment.MEDIA_MOUNTED);
+        FirebaseCrashlytics.getInstance().log("Carte SD présente: " + isPresent);
+        return isPresent;
     }
 
     /**
@@ -428,7 +436,7 @@ public class AndyUtils {
     public static int convertDpsToInt(Context context, int dps) {
         if (context == null) {
             Log.e(TAG, "Le contexte est null dans convertDpsToInt");
-            Toast.makeText(context, "Le contexte est null dans convertDpsToInt", Toast.LENGTH_SHORT).show();
+            ToastManager.showError("Le contexte est null dans convertDpsToInt");
             return dps;
         }
 
@@ -437,7 +445,7 @@ public class AndyUtils {
             return (int) (dps * scale + 0.5f);
         } catch (Exception e) {
             Log.e(TAG, "Exception lors de la conversion dp en pixels", e);
-            Toast.makeText(context, "Exception lors de la conversion dp en pixels", Toast.LENGTH_SHORT).show();
+            ToastManager.showError("Exception lors de la conversion dp en pixels");
             return dps;
         }
     }

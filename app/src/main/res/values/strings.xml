@@ -1,3 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name" translatable="false">CONTROLprest</string>
     <string name="hint_pseudo" translatable="false">Pseudo</string>
@@ -20,9 +21,9 @@
     <string name="hint_get_mail" translatable="false">Entrez votre adresse de contact</string>
     <string name="btn_valid">Validate</string>
     <string name="btn_send">Send</string>
-    <string name="mess_unlock_acces">unlock access</string>
-    <string name="mess_get_identifient">get your identifients</string>
-    <string name="mess_mail_send">A mail was send to</string>
+    <string name="mess_unlock_acces">Unlock access</string>
+    <string name="mess_get_identifient">Get your identifiers</string>
+    <string name="mess_mail_send">A mail was sent to</string>
     <string name="lbl_selection">Select</string>
     <string name="_prev" translatable="false"><![CDATA[<]]></string>
     <string name="hint_search">Search an entry</string>
@@ -40,7 +41,7 @@
     <string name="hint_name_rsd">Name</string>
     <string name="hint_ref_rsd">Reference</string>
     <string name="hint_entry_rsd">Entry</string>
-    <string name="hint_adr_rsd">Adress</string>
+    <string name="hint_adr_rsd">Address</string>
     <string name="btn_finish">Finish</string>
     <string name="hint_icon" translatable="false">icon</string>
     <string name="lbl_zone" translatable="false">Zone</string>
@@ -66,7 +67,7 @@
     <string name="mess_comment_bad" translatable="false">Vous devez laisser un commentaire.</string>
     <string name="lbl_img" translatable="false">Désordre technique</string>
     <string name="mess_use_finish">Use END button</string>
-    <string name="btn_next">next</string>
+    <string name="btn_next">Next</string>
     <string name="_dest" translatable="false">Destinataire</string>
     <string name="entry_lbl" translatable="false">Entrée :</string>
     <string name="adresse_lbl" translatable="false">Adresse :</string>
@@ -74,15 +75,141 @@
     <string name="lbl_write_nfs">To write</string>
     <string name="lbl_load_nfs">Loaded</string>
     <string name="mess_bad_nfc">You can\'t use this app without NFC service activated</string>
-    <string name="txt_close_tag">Tag succefuly programed. Tap to close.</string>
-    <string name="txt_wait_tag">Put tag to proced.</string>
-    <string name="mess_timeout">Temps de réception des données dépassé</string>
-    <string name="un_message_a_t_envoy">Un message a été envoyé</string>
-    <string name="erreur_de_communication_avec_le_serveur">Erreur de communication avec le serveur</string>
-    <string name="erreur_lors_de_l_envoi_de_la_demande">Erreur lors de l\'envoi de la demande</string>
-    <string name="une_erreur_est_survenue_lors_de_l_initialisation">Une erreur est survenue lors de l\'initialisation</string>
-    <string name="veuillez_entrer_une_adresse_email">Veuillez entrer une adresse email</string>
-    <string name="veuillez_entrer_une_adresse_email_valide">Veuillez entrer une adresse email valide</string>
-    <string name="erreur_lors_du_traitement_de_la_r_ponse">Erreur lors du traitement de la réponse</string>
-    <string name="selectionner_une_entree">SELECTIONNER UNE ENTREE</string>
+    <string name="txt_close_tag">Tag successfully programmed. Tap to close.</string>
+    <string name="txt_wait_tag">Put tag to proceed.</string>
+    <string name="mess_timeout">Request timeout</string>
+    <string name="un_message_a_t_envoy">A message has been sent</string>
+    <string name="erreur_de_communication_avec_le_serveur">Communication error with the server</string>
+    <string name="erreur_lors_de_l_envoi_de_la_demande">Error while sending the request</string>
+    <string name="une_erreur_est_survenue_lors_de_l_initialisation">An error occurred during initialization</string>
+    <string name="veuillez_entrer_une_adresse_email">Please enter an email address</string>
+    <string name="veuillez_entrer_une_adresse_email_valide">Please enter a valid email address</string>
+    <string name="erreur_lors_du_traitement_de_la_r_ponse">Error while processing the response</string>
+    <string name="selectionner_une_entree">SELECT AN ENTRY</string>
+
+    <!-- Error and status messages -->
+    <string name="erreur_lors_de_l_initialisation_de_l_application">Error during application initialization</string>
+    <string name="erreur_lors_du_d_marrage_de_l_application">Error while starting the application</string>
+    <string name="erreur_lors_du_traitement_des_r_sultats_de_permission">Error while processing permission results</string>
+    <string name="erreur_lors_du_traitement_de_l_action">Error while processing the action</string>
+    <string name="erreur_lors_de_la_v_rification_des_permissions">Error while checking permissions</string>
+    <string name="une_tentative_de_connexion_est_d_j_en_cours">A connection attempt is already in progress</string>
+    <string name="erreur_d_encodage_des_param_tres">Error encoding parameters</string>
+    <string name="erreur_lors_de_la_tentative_de_connexion">Error during connection attempt</string>
+    <string name="erreur_lors_de_la_connexion">Error during connection</string>
+    <string name="une_op_ration_est_d_j_en_cours">An operation is already in progress</string>
+    <string name="erreur_lors_de_la_d_connexion">Error during disconnection</string>
+    <string name="erreur_lors_de_la_r_initialisation_des_pr_f_rences">Error while resetting preferences</string>
+    <string name="erreur_lors_de_l_ouverture_de_l_cran_de_demande">Error while opening the request screen</string>
+    <string name="impossible_d_ouvrir_la_page_web">Unable to open the web page</string>
+    <string name="r_ponse_invalide_du_serveur">Invalid server response</string>
+    <string name="r_ponse_incompl_te_du_serveur">Incomplete server response</string>
+    <string name="format_de_r_ponse_invalide">Invalid response format</string>
+    <string name="erreur_lors_du_traitement_du_r_sultat">Error while processing the result</string>
+    <string name="erreur_lors_de_la_fermeture_de_l_application">Error while closing the application</string>
+    <string name="mise_jour_annul_e_par_l_utilisateur">Update canceled by user</string>
+    <string name="chec_de_la_mise_jour_l_application_continuera_avec_la_version_actuelle">Update failed, the application will continue with the current version</string>
+    <string name="erreur_lors_du_traitement_du_r_sultat_de_mise_jour">Error while processing update result</string>
+    <string name="erreur_lors_de_la_v_rification_du_nfc">Error while checking NFC</string>
+    <string name="une_v_rification_de_mise_jour_est_d_j_en_cours">An update check is already in progress</string>
+    <string name="r_cup_rez_une_connexion_pour_utiliser_l_application">Please restore your connection to use the application</string>
+    <string name="erreur_lors_de_la_v_rification_de_mise_jour">Error while checking for updates</string>
+    <string name="application_non_install_e_depuis_le_play_store_aucune_v_rification_de_mise_jour">Application not installed from Play Store, no update check</string>
+    <string name="erreur_lors_de_la_v_rification_des_mises_jour">Error while checking for updates</string>
+    <string name="erreur_lors_de_la_v_rification_de_la_source_d_installation">Error while checking installation source</string>
+    <string name="erreur_lors_de_l_affichage_du_message_d_erreur">Error while displaying error message</string>
+    <string name="donn_es_d_entr_e_invalides">Invalid input data</string>
+    <string name="type_de_s_lection_invalide">Invalid selection type</string>
+    <string name="erreur_lors_de_l_initialisation">Error during initialization</string>
+    <string name="type_de_s_lection_inconnu">Unknown selection type</string>
+    <string name="aucune_agence_disponible">No agency available</string>
+    <string name="incoh_rence_dans_les_donn_es_d_agences">Inconsistency in agency data</string>
+    <string name="chec_de_l_inflation_de_la_vue_d_agence">Failed to inflate agency view</string>
+    <string name="textview_non_trouv_dans_la_vue_d_agence">TextView not found in agency view</string>
+    <string name="tag_null_lors_du_clic_sur_une_agence">Null tag when clicking on an agency</string>
+    <string name="erreur_lors_de_la_s_lection">Error during selection</string>
+    <string name="erreur_lors_de_l_ajout_de_la_vue_d_agence_au_layout">Error while adding agency view to layout</string>
+    <string name="erreur_lors_de_la_cr_ation_de_la_vue">Error while creating view</string>
+    <string name="erreur_lors_du_chargement_des_agences">Error while loading agencies</string>
+    <string name="aucun_groupement_disponible">No group available</string>
+    <string name="incoh_rence_dans_les_donn_es_de_groupements">Inconsistency in group data</string>
+    <string name="chec_de_la_construction_de_la_vue_de_groupement">Failed to build group view</string>
+    <string name="tag_null_lors_du_clic_sur_un_groupement">Null tag when clicking on a group</string>
+    <string name="erreur_lors_du_chargement_des_groupements">Error while loading groups</string>
+    <string name="aucune_r_sidence_disponible">No residence available</string>
+    <string name="incoh_rence_dans_les_donn_es_de_r_sidences">Inconsistency in residence data</string>
+    <string name="un_ou_plusieurs_textview_manquants_dans_la_vue_de_r_sidence">One or more TextView missing in residence view</string>
+    <string name="tag_null_lors_du_clic_sur_une_r_sidence">Null tag when clicking on a residence</string>
+    <string name="erreur_lors_de_l_ajout_de_la_vue_de_r_sidence_au_layout">Error while adding residence view to layout</string>
+    <string name="erreur_lors_de_la_cr_ation_de_l_l_ment_de_r_sidence">Error while creating residence element</string>
+    <string name="erreur_lors_du_chargement_des_r_sidences">Error while loading residences</string>
+    <string name="erreur_lors_de_la_fermeture_de_l_activit">Error while closing activity</string>
+    <string name="erreur_d_initialisation">Initialization error</string>
+    <string name="aucune_r_sidence_s_lectionn_e">No residence selected</string>
+    <string name="l_id_client_est_null_ou_vide">Client ID is null or empty</string>
+    <string name="erreur_d_activation_nfc">NFC activation error</string>
+    <string name="erreur_lors_de_la_lecture_du_tag_nfc">Error while reading NFC tag</string>
+    <string name="tag_d_action_inconnu">Unknown action tag</string>
+    <string name="erreur_lors_de_la_configuration_nfc">Error during NFC configuration</string>
+    <string name="chec_de_l_criture_du_tag">Tag writing failed</string>
+    <string name="ce_tag_est_en_lecture_seule_et_ne_peut_pas_tre_modifi">This tag is read-only and cannot be modified</string>
+    <string name="ce_tag_est_trop_petit_pour_contenir_les_donn_es">This tag is too small to contain the data</string>
+    <string name="erreur_lors_de_l_criture_du_tag_veuillez_r_essayer">Error while writing tag. Please try again.</string>
+    <string name="format_de_tag_non_compatible">Incompatible tag format</string>
+    <string name="erreur_inattendue_lors_de_l_criture_du_tag">Unexpected error while writing tag</string>
+    <string name="invalid_search_request">Invalid search request</string>
+    <string name="search_term_is_empty">Search term is empty</string>
+    <string name="login_information_is_missing">Login information is missing</string>
+    <string name="server_returned_null_response">Server returned null response</string>
+    <string name="error_parsing_server_response">Error parsing server response</string>
+    <string name="error_encoding_search_term">Error encoding search term</string>
+    <string name="an_unexpected_error_occurred">An unexpected error occurred</string>
+    <string name="insufficient_tokens_in_item_data">Insufficient tokens in item data</string>
+    <string name="error_parsing_numeric_field">Error parsing numeric field</string>
+    <string name="error_setting_fiche_data">Error setting fiche data</string>
+    <string name="error_processing_token">Error processing token</string>
+    <string name="error_processing_search_results">Error processing search results</string>
+    <string name="failed_to_inflate_view">Failed to inflate view</string>
+    <string name="error_creating_list_item">Error creating list item</string>
+    <string name="error_initializing">Error initializing: </string>
+    <string name="error_cleaning_up">Error cleaning up: </string>
+    <string name="view_or_view_tag_is_null">View or view tag is null</string>
+    <string name="unknown_view_tag">Unknown view tag: </string>
+    <string name="error_processing_action">Error processing action: </string>
+    <string name="invalid_agency_selection">Invalid agency selection</string>
+    <string name="invalid_group_selection">Invalid group selection</string>
+    <string name="invalid_residence_selection">Invalid residence selection</string>
+    <string name="search_input_is_null">Search input is null</string>
+    <string name="please_enter_a_search_term">Please enter a search term</string>
+    <string name="starting_search">Starting search: </string>
+    <string name="no_agencies_available">No agencies available</string>
+    <string name="please_select_an_agency_first">Please select an agency first</string>
+    <string name="no_groups_available">No groups available</string>
+    <string name="please_select_a_group_first">Please select a group first</string>
+    <string name="no_residences_available">No residences available</string>
+    <string name="unknown_type_select">Unknown type select: </string>
+    <string name="starting_select">Starting select: </string>
+    <string name="please_select_a_residence_first">Please select a residence first</string>
+    <string name="starting_control">Starting control: </string>
+    <string name="finishing_loginactivity">Finishing LoginActivity: </string>
+    <string name="disconnection_error">Disconnection error: </string>
+    <string name="no_agencies_data_available">No agencies data available</string>
+    <string name="select_an_agency">Select an agency</string>
+    <string name="invalid_agency_format">Invalid agency format: </string>
+    <string name="loading_agencies">Loading agencies: </string>
+    <string name="select_a_group">Select a group</string>
+    <string name="no_group_data_received">No group data received</string>
+    <string name="no_grps_key_in_json_data">No \'grps\' key in JSON data</string>
+    <string name="error_parsing_groups_data">Error parsing groups data: </string>
+    <string name="loading_groups">Loading groups: </string>
+    <string name="invalid_group_index">Invalid group index: </string>
+    <string name="no_data_available_for_this_group">No data available for this group</string>
+    <string name="processing_residence_data">Processing residence data</string>
+    <string name="residence_with_empty_id_found_skipping">Residence with empty ID found, skipping</string>
+    <string name="parsing_residence_id">Parsing residence ID</string>
+    <string name="selected_residence_no_longer_available">Selected residence no longer available</string>
+    <string name="no_residences_available_for_this_group">No residences available for this group</string>
+    <string name="loading_residences">Loading residences: </string>
+    <string name="showing_wait_indicator">Showing wait indicator: </string>
+    <string name="select_a_residence">Select a residence</string>
 </resources>

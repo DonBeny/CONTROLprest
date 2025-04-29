@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "283520017406",
+    "project_id": "controlprest",
+    "storage_bucket": "controlprest.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:283520017406:android:b721d0902d04e09f5dd6af",
+        "android_client_info": {
+          "package_name": "org.orgaprop.controlprest"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDhQ3WUXZuA2_yFpBxLp6g07J0b663xkRQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
