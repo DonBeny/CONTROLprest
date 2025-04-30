@@ -3,6 +3,7 @@ package org.orgaprop.controlprest.services;
 import android.content.Context;
 import android.net.ConnectivityManager;
 import android.net.NetworkCapabilities;
+import android.net.Uri;
 import android.os.Bundle;
 import android.util.Log;
 
@@ -15,6 +16,7 @@ import com.google.firebase.crashlytics.FirebaseCrashlytics;
 import java.io.BufferedInputStream;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
+import java.io.Closeable;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -37,11 +39,11 @@ public class HttpTask {
 
 //********* PRIVATE VARIABLES
 
-    private Context context;
+    private final Context context;
     private static final String TAG = "HttpTask";
     private final ExecutorService executorService;
-    private FirebaseCrashlytics crashlytics;
-    private FirebaseAnalytics analytics;
+    private final FirebaseCrashlytics crashlytics;
+    private final FirebaseAnalytics analytics;
 
 //********* STATIC VARIABLES
 
@@ -77,39 +79,18 @@ public class HttpTask {
 //********* CONSTRUCTORS
 
     public HttpTask(Context context) {
-        try {
-            if (context == null) {
-                throw new IllegalArgumentException("Le contexte ne peut pas être null");
-            }
-            this.context = context;
-            this.executorService = Executors.newCachedThreadPool();
-
-            // Initialiser Crashlytics
-            this.crashlytics = FirebaseCrashlytics.getInstance();
-            crashlytics.log("HttpTask initialisé");
-
-            analytics = FirebaseAnalytics.getInstance(context);
-
-            Bundle screenViewParams = new Bundle();
-            screenViewParams.putString(FirebaseAnalytics.Param.SCREEN_NAME, "HttpTask");
-            screenViewParams.putString(FirebaseAnalytics.Param.SCREEN_CLASS, "HttpTask");
-            analytics.logEvent(FirebaseAnalytics.Event.SCREEN_VIEW, screenViewParams);
-        } catch (Exception e) {
-            Log.e(TAG, "Erreur lors de l'initialisation de HttpTask", e);
-            FirebaseCrashlytics.getInstance();
-            FirebaseCrashlytics.getInstance().recordException(e);
-
-            if (context != null) {
-                analytics = FirebaseAnalytics.getInstance(context);
-
-                Bundle screenViewParams = new Bundle();
-                screenViewParams.putString(FirebaseAnalytics.Param.SCREEN_NAME, "HttpTask");
-                screenViewParams.putString(FirebaseAnalytics.Param.SCREEN_CLASS, "HttpTask");
-                analytics.logEvent(FirebaseAnalytics.Event.SCREEN_VIEW, screenViewParams);
-            }
-
-            throw e;
+        if (context == null) {
+            throw new IllegalArgumentException("Le contexte ne peut pas être null");
         }
+
+        this.context = context;
+        this.executorService = Executors.newCachedThreadPool();
+
+        // Initialiser Crashlytics et Analytics
+        this.crashlytics = FirebaseCrashlytics.getInstance();
+        this.analytics = FirebaseAnalytics.getInstance(context);
+
+        logInfo("HttpTask initialisé", "init");
     }
 
     /**
@@ -151,350 +132,305 @@ public class HttpTask {
     public CompletableFuture<String> executeHttpTask(String... params) {
         return CompletableFuture.supplyAsync(() -> {
             try {
-                if (params == null || params.length < 4) {
-                    crashlytics.log("Paramètres insuffisants pour executeHttpTask");
-                    Log.e(TAG, "Paramètres insuffisants pour executeHttpTask");
-
-                    Bundle errorParams = new Bundle();
-                    errorParams.putString("error_type", "insufficient_parameters");
-                    errorParams.putString("class", "HttpTask");
-                    analytics.logEvent("executeHttpTask_insufficient_parameters", errorParams);
-
-                    return "0Paramètres insuffisants";
+                // Validation des paramètres
+                if (!validateParams(params)) {
+                    return "0Paramètres insuffisants ou invalides";
                 }
 
                 String paramsAct = params[0];
                 String paramsCbl = params[1];
-                String paramsGet = params[2];
-                String paramsPost = params[3];
+                String paramsGet = params[2] != null ? params[2] : "";
+                String paramsPost = params[3] != null ? params[3] : "";
 
                 crashlytics.setCustomKey("httpTaskAct", paramsAct);
                 crashlytics.setCustomKey("httpTaskCbl", paramsCbl);
-                crashlytics.log("executeHttpTask: " + paramsAct + "/" + paramsCbl);
 
-                Bundle httpTaskParams = new Bundle();
-                httpTaskParams.putString("action", paramsAct);
-                httpTaskParams.putString("cible", paramsCbl);
-                analytics.logEvent("executeHttpTask", httpTaskParams);
+                logInfo("Exécution de la requête HTTP: " + paramsAct + "/" + paramsCbl, "http_request");
 
-                if (paramsAct.isEmpty() || paramsCbl.isEmpty()) {
-                    crashlytics.log("Paramètres 'act' ou 'cbl' manquants");
-                    Log.e(TAG, "Paramètres 'act' ou 'cbl' manquants");
-
-                    Bundle errorParams = new Bundle();
-                    errorParams.putString("error_type", "missing_parameters");
-                    errorParams.putString("class", "HttpTask");
-                    analytics.logEvent("executeHttpTask_missing_parameters", errorParams);
-
-                    return "0Paramètres manquants (action ou cible)";
-                }
-                if (paramsGet == null) paramsGet = "";
-                if (paramsPost == null) paramsPost = "";
-
+                // Vérification de la connexion réseau
                 if (!isNetworkAvailable()) {
-                    crashlytics.log("Pas de connexion réseau disponible");
-                    Log.e(TAG, "Pas de connexion réseau disponible");
-
-                    Bundle errorParams = new Bundle();
-                    errorParams.putString("error_type", "no_network");
-                    errorParams.putString("class", "HttpTask");
-                    analytics.logEvent("executeHttpTask_no_network", errorParams);
-
+                    logWarning("Pas de connexion réseau disponible", "no_network");
                     return "0Aucune connexion réseau disponible";
                 }
 
-                int retryCount = 0;
-                String result = null;
-                Exception lastException = null;
-
-                while (retryCount < TIME_OUT) {
-                    HttpsURLConnection urlConnection = null;
-
-                    try {
-                        String stringUrl = HTTP_ADRESS_SERVER + LoginActivity.ACCESS_CODE + ".php";
-                        stringUrl += "?act=" + paramsAct;
-                        stringUrl += "&cbl=" + paramsCbl;
-
-                        if (!paramsGet.isEmpty()) {
-                            stringUrl += "&" + paramsGet;
-                        }
-
-                        crashlytics.log("Tentative de connexion à: " + stringUrl + " (Tentative " + (retryCount + 1) + "/" + TIME_OUT + ")");
-                        Log.d(TAG, "Tentative de connexion à: " + stringUrl);
-
-                        Bundle httpTaskParams2 = new Bundle();
-                        httpTaskParams2.putString("url", stringUrl);
-                        analytics.logEvent("executeHttpTask_url", httpTaskParams2);
-
-                        URL url = new URL(stringUrl);
-
-                        urlConnection = (HttpsURLConnection) url.openConnection();
-                        urlConnection.setReadTimeout(READ_TIMEOUT_MS);
-                        urlConnection.setConnectTimeout(CONNECTION_TIMEOUT_MS);
-                        urlConnection.setRequestMethod("POST");
-                        urlConnection.setDoInput(true);
-                        urlConnection.setDoOutput(true);
-                        urlConnection.setUseCaches(false);
-
-                        urlConnection.setRequestProperty("Cache-Control", "no-cache, no-store, must-revalidate");
-                        urlConnection.setRequestProperty("Pragma", "no-cache");
-                        urlConnection.setRequestProperty("Expires", "0");
-
-                        if (!paramsPost.isEmpty()) {
-                            crashlytics.log("Envoi de données POST");
-                            try (
-                                    OutputStream outputStream = urlConnection.getOutputStream();
-                                    BufferedWriter bufferedWriter = new BufferedWriter(
-                                            new OutputStreamWriter(outputStream, StandardCharsets.UTF_8))
-                            ) {
-                                bufferedWriter.write(paramsPost);
-                                bufferedWriter.flush();
-                            }
-                        }
-
-                        int responseCode = urlConnection.getResponseCode();
-
-                        crashlytics.log("Code de réponse HTTP: " + responseCode);
-                        Log.d(TAG, "Code de réponse HTTP: " + responseCode);
-
-                        Bundle httpTaskParams3 = new Bundle();
-                        httpTaskParams3.putString("code", String.valueOf(responseCode));
-                        analytics.logEvent("executeHttpTask_response_code", httpTaskParams3);
-
-                        if (responseCode == HttpsURLConnection.HTTP_OK) {
-                            try (InputStream in = new BufferedInputStream(urlConnection.getInputStream())) {
-                                result = readStream(in);
-
-                                // Vérifier si la réponse est valide
-                                if (result == null || result.isEmpty()) {
-                                    crashlytics.log("Réponse vide du serveur");
-                                    Log.w(TAG, "Réponse vide du serveur");
-
-                                    Bundle errorParams = new Bundle();
-                                    errorParams.putString("error_type", "empty_response");
-                                    errorParams.putString("class", "HttpTask");
-                                    analytics.logEvent("executeHttpTask_empty_response", errorParams);
-
-                                    result = "0Réponse vide du serveur";
-                                } else {
-                                    crashlytics.log("Réponse reçue avec succès: " + (result.length() > 100 ? result.substring(0, 100) + "..." : result));
-                                    Log.d(TAG, "Réponse reçue avec succès");
-
-                                    Bundle httpTaskParams4 = new Bundle();
-                                    httpTaskParams4.putString("response", result);
-                                    analytics.logEvent("executeHttpTask_response", httpTaskParams4);
-
-                                    return result; // Succès, sortir de la boucle
-                                }
-                            }
-                        } else {
-                            // Gérer les différents codes d'erreur HTTP
-                            String errorMessage;
-
-                            switch (responseCode) {
-                                case HttpsURLConnection.HTTP_NOT_FOUND:
-                                    errorMessage = "0Service non trouvé (404)";
-                                    break;
-                                case HttpsURLConnection.HTTP_INTERNAL_ERROR:
-                                    errorMessage = "0Erreur interne du serveur (500)";
-                                    break;
-                                case HttpsURLConnection.HTTP_UNAVAILABLE:
-                                    errorMessage = "0Service temporairement indisponible (503)";
-                                    break;
-                                case HttpsURLConnection.HTTP_UNAUTHORIZED:
-                                    errorMessage = "0Non autorisé (401)";
-                                    break;
-                                case HttpsURLConnection.HTTP_FORBIDDEN:
-                                    errorMessage = "0Accès interdit (403)";
-                                    break;
-                                default:
-                                    errorMessage = "0Erreur HTTP: " + responseCode;
-                            }
-
-                            // Lire le message d'erreur si disponible
-                            try (InputStream errorStream = urlConnection.getErrorStream()) {
-                                if (errorStream != null) {
-                                    String errorBody = readStream(errorStream);
-                                    crashlytics.log("Corps de la réponse d'erreur: " + errorBody);
-                                    Log.e(TAG, "Corps de la réponse d'erreur: " + errorBody);
-
-                                    Bundle httpTaskParams5 = new Bundle();
-                                    httpTaskParams5.putString("error_body", errorBody);
-                                    analytics.logEvent("executeHttpTask_error_body", httpTaskParams5);
-                                }
-                            } catch (IOException e) {
-                                crashlytics.recordException(e);
-                                Log.e(TAG, "Erreur lors de la lecture du flux d'erreur", e);
-
-                                Bundle errorParams = new Bundle();
-                                errorParams.putString("error_type", "error_reading_error_stream");
-                                errorParams.putString("class", "HttpTask");
-                                analytics.logEvent("executeHttpTask_error_stream", errorParams);
-                            }
-
-                            crashlytics.log(errorMessage);
-                            Log.e(TAG, errorMessage);
-
-                            Bundle errorParams = new Bundle();
-                            errorParams.putString("error_type", "http_error");
-                            errorParams.putString("class", "HttpTask");
-                            errorParams.putString("error_message", errorMessage);
-                            analytics.logEvent("executeHttpTask_http_error", errorParams);
-
-                            result = errorMessage;
-                        }
-                    } catch (SocketTimeoutException e) {
-                        lastException = e;
-
-                        crashlytics.recordException(e);
-                        crashlytics.log("Timeout lors de la connexion au serveur: " + e.getMessage());
-                        Log.e(TAG, "Timeout lors de la connexion au serveur", e);
-
-                        Bundle errorParams = new Bundle();
-                        errorParams.putString("error_type", "timeout");
-                        errorParams.putString("class", "HttpTask");
-                        errorParams.putString("error_message", e.getMessage());
-                        analytics.logEvent("executeHttpTask_timeout", errorParams);
-
-                        result = "0Temps d'attente dépassé";
-                    } catch (UnknownHostException e) {
-                        lastException = e;
-
-                        crashlytics.recordException(e);
-                        crashlytics.log("Hôte inconnu: " + e.getMessage());
-                        Log.e(TAG, "Hôte inconnu", e);
-
-                        Bundle errorParams = new Bundle();
-                        errorParams.putString("error_type", "unknown_host");
-                        errorParams.putString("class", "HttpTask");
-                        errorParams.putString("error_message", e.getMessage());
-                        analytics.logEvent("executeHttpTask_unknown_host", errorParams);
-
-                        result = "0Serveur non trouvé";
-                    } catch (SSLException e) {
-                        lastException = e;
-
-                        crashlytics.recordException(e);
-                        crashlytics.log("Erreur SSL: " + e.getMessage());
-                        Log.e(TAG, "Erreur SSL", e);
-
-                        Bundle errorParams = new Bundle();
-                        errorParams.putString("error_type", "ssl_error");
-                        errorParams.putString("class", "HttpTask");
-                        errorParams.putString("error_message", e.getMessage());
-                        analytics.logEvent("executeHttpTask_ssl_error", errorParams);
-
-                        result = "0Erreur de sécurité lors de la connexion";
-                    } catch (IOException e) {
-                        lastException = e;
-
-                        crashlytics.recordException(e);
-                        crashlytics.log("Erreur d'E/S: " + e.getMessage());
-                        Log.e(TAG, "Erreur d'E/S", e);
-
-                        Bundle errorParams = new Bundle();
-                        errorParams.putString("error_type", "io_error");
-                        errorParams.putString("class", "HttpTask");
-                        errorParams.putString("error_message", e.getMessage());
-                        analytics.logEvent("executeHttpTask_io_error", errorParams);
-
-                        result = "0Erreur de communication";
-                    } catch (Exception e) {
-                        lastException = e;
-
-                        crashlytics.recordException(e);
-                        crashlytics.log("Exception inattendue: " + e.getMessage());
-                        Log.e(TAG, "Exception inattendue", e);
-
-                        Bundle errorParams = new Bundle();
-                        errorParams.putString("error_type", "unexpected_exception");
-                        errorParams.putString("class", "HttpTask");
-                        errorParams.putString("error_message", e.getMessage());
-                        analytics.logEvent("executeHttpTask_unexpected_exception", errorParams);
-
-                        result = "0Erreur inattendue: " + e.getMessage();
-                    } finally {
-                        if (urlConnection != null) {
-                            try {
-                                urlConnection.disconnect();
-                            } catch (Exception e) {
-                                crashlytics.recordException(e);
-                                Log.e(TAG, "Erreur lors de la déconnexion", e);
-
-                                Bundle errorParams = new Bundle();
-                                errorParams.putString("error_type", "disconnect_error");
-                                errorParams.putString("class", "HttpTask");
-                                errorParams.putString("error_message", e.getMessage());
-                                analytics.logEvent("executeHttpTask_disconnect_error", errorParams);
-                            }
-                        }
-                    }
-
-                    retryCount++;
-
-                    if (retryCount < TIME_OUT) {
-                        crashlytics.log("Tentative " + retryCount + "/" + TIME_OUT + ", attente avant nouvelle tentative");
-                        Log.d(TAG, "Tentative " + retryCount + "/" + TIME_OUT + ", attente avant nouvelle tentative");
-
-                        Bundle httpTaskParams6 = new Bundle();
-                        httpTaskParams6.putString("retry", String.valueOf(retryCount));
-                        analytics.logEvent("executeHttpTask_retry", httpTaskParams6);
-
-                        try {
-                            Thread.sleep(RETRY_DELAY_MS);
-                        } catch (InterruptedException ie) {
-                            crashlytics.recordException(ie);
-                            Thread.currentThread().interrupt();
-                            Log.e(TAG, "Interruption pendant l'attente entre tentatives", ie);
-
-                            Bundle errorParams = new Bundle();
-                            errorParams.putString("error_type", "sleep_error");
-                            errorParams.putString("class", "HttpTask");
-                            errorParams.putString("error_message", ie.getMessage());
-                            analytics.logEvent("executeHttpTask_sleep_error", errorParams);
-                        }
-                    }
-                }
-
-                if (lastException != null) {
-                    crashlytics.log("Toutes les tentatives ont échoué avec la dernière exception: " + lastException.getMessage());
-                    Log.e(TAG, "Toutes les tentatives ont échoué avec la dernière exception:", lastException);
-
-                    Bundle errorParams = new Bundle();
-                    errorParams.putString("error_type", "last_exception");
-                    errorParams.putString("class", "HttpTask");
-                    errorParams.putString("error_message", lastException.getMessage());
-                    analytics.logEvent("executeHttpTask_last_exception", errorParams);
-                }
-
-                return result;
+                // Effectuer les tentatives de connexion
+                return performHttpRequest(paramsAct, paramsCbl, paramsGet, paramsPost);
             } catch (Exception e) {
-                crashlytics.recordException(e);
-                Log.e(TAG, "Erreur non gérée dans executeHttpTask", e);
-
-                Bundle errorParams = new Bundle();
-                errorParams.putString("error_type", "unexpected_exception");
-                errorParams.putString("class", "HttpTask");
-                errorParams.putString("error_message", e.getMessage());
-                analytics.logEvent("executeHttpTask_unexpected_exception", errorParams);
-
+                logException(e, "unexpected_exception", "Erreur non gérée dans executeHttpTask");
                 return "0Erreur non gérée: " + e.getMessage();
             }
-        });
+        }, executorService);
+    }
+
+    /**
+     * Ferme proprement l'executorService
+     */
+    public void shutdown() {
+        try {
+            logInfo("Arrêt de HttpTask", "shutdown");
+
+            if (executorService != null && !executorService.isShutdown()) {
+                executorService.shutdown();
+
+                if (!executorService.awaitTermination(5, TimeUnit.SECONDS)) {
+                    executorService.shutdownNow();
+                    logWarning("ExecutorService forcé à s'arrêter", "force_shutdown");
+                }
+            }
+        } catch (Exception e) {
+            logException(e, "shutdown_error", "Erreur lors de l'arrêt de l'ExecutorService");
+        }
     }
 
 //********* PRIVATE VARIABLES
 
+    /**
+     * Valide les paramètres de la requête HTTP
+     */
+    private boolean validateParams(String[] params) {
+        if (params == null || params.length < 4) {
+            logWarning("Paramètres insuffisants pour executeHttpTask", "insufficient_parameters");
+            return false;
+        }
+
+        String paramsAct = params[0];
+        String paramsCbl = params[1];
+
+        if (paramsAct == null || paramsAct.isEmpty() || paramsCbl == null || paramsCbl.isEmpty()) {
+            logWarning("Paramètres 'act' ou 'cbl' manquants", "missing_parameters");
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Effectue la requête HTTP avec gestion des tentatives
+     */
+    private String performHttpRequest(String paramsAct, String paramsCbl, String paramsGet, String paramsPost) {
+        int retryCount = 0;
+        String result = null;
+        Exception lastException = null;
+
+        while (retryCount < TIME_OUT) {
+            HttpsURLConnection urlConnection = null;
+
+            try {
+                // Construction de l'URL avec Uri.Builder pour éviter les problèmes d'encodage
+                Uri.Builder uriBuilder = Uri.parse(HTTP_ADRESS_SERVER + LoginActivity.ACCESS_CODE + ".php").buildUpon();
+                uriBuilder.appendQueryParameter("act", paramsAct);
+                uriBuilder.appendQueryParameter("cbl", paramsCbl);
+
+                // Ajout des paramètres GET supplémentaires
+                if (!paramsGet.isEmpty()) {
+                    // Séparation des paramètres GET et ajout au builder
+                    String[] getParams = paramsGet.split("&");
+                    for (String param : getParams) {
+                        String[] keyValue = param.split("=", 2);
+                        if (keyValue.length == 2) {
+                            uriBuilder.appendQueryParameter(keyValue[0], keyValue[1]);
+                        }
+                    }
+                }
+
+                String stringUrl = uriBuilder.build().toString();
+                logInfo("Tentative de connexion à: " + stringUrl + " (Tentative " + (retryCount + 1) + "/" + TIME_OUT + ")", "connection_attempt");
+
+                // Configuration de la connexion
+                urlConnection = setupConnection(stringUrl);
+
+                // Envoi des données POST si nécessaire
+                if (!paramsPost.isEmpty()) {
+                    sendPostData(urlConnection, paramsPost);
+                }
+
+                // Lecture de la réponse
+                int responseCode = urlConnection.getResponseCode();
+                logInfo("Code de réponse HTTP: " + responseCode, "response_code");
+
+                if (responseCode == HttpsURLConnection.HTTP_OK) {
+                    // Lecture du flux de réponse dans une méthode séparée avec gestion de ressources
+                    try (InputStream in = new BufferedInputStream(urlConnection.getInputStream())) {
+                        result = readStream(in);
+
+                        // Vérifier si la réponse est valide
+                        if (result == null || result.isEmpty()) {
+                            logWarning("Réponse vide du serveur", "empty_response");
+                            result = "0Réponse vide du serveur";
+                        } else {
+                            logInfo("Réponse reçue avec succès", "success_response");
+                            return result; // Succès, sortir de la boucle
+                        }
+                    }
+                } else {
+                    // Gestion des erreurs HTTP
+                    result = handleHttpError(urlConnection, responseCode);
+                }
+            } catch (Exception e) {
+                lastException = e;
+                result = handleConnectionException(e);
+            } finally {
+                // Fermeture sécurisée de la connexion
+                closeConnection(urlConnection);
+            }
+
+            retryCount++;
+
+            if (retryCount < TIME_OUT) {
+                logInfo("Tentative " + retryCount + "/" + TIME_OUT + ", attente avant nouvelle tentative", "retry");
+
+                try {
+                    Thread.sleep(RETRY_DELAY_MS);
+                } catch (InterruptedException ie) {
+                    logException(ie, "sleep_error", "Interruption pendant l'attente entre tentatives");
+                    Thread.currentThread().interrupt();
+                }
+            }
+        }
+
+        if (lastException != null) {
+            logWarning("Toutes les tentatives ont échoué avec la dernière exception: " + lastException.getMessage(), "all_attempts_failed");
+        }
+
+        return result;
+    }
+
+    /**
+     * Configure la connexion HTTPS
+     */
+    private HttpsURLConnection setupConnection(String stringUrl) throws IOException {
+        URL url = new URL(stringUrl);
+        HttpsURLConnection urlConnection = (HttpsURLConnection) url.openConnection();
+
+        urlConnection.setReadTimeout(READ_TIMEOUT_MS);
+        urlConnection.setConnectTimeout(CONNECTION_TIMEOUT_MS);
+        urlConnection.setRequestMethod("POST");
+        urlConnection.setDoInput(true);
+        urlConnection.setDoOutput(true);
+        urlConnection.setUseCaches(false);
+
+        urlConnection.setRequestProperty("Cache-Control", "no-cache, no-store, must-revalidate");
+        urlConnection.setRequestProperty("Pragma", "no-cache");
+        urlConnection.setRequestProperty("Expires", "0");
+
+        return urlConnection;
+    }
+
+    /**
+     * Envoie les données POST
+     */
+    private void sendPostData(HttpsURLConnection urlConnection, String paramsPost) throws IOException {
+        logInfo("Envoi de données POST", "post_data");
+
+        OutputStream outputStream = null;
+        BufferedWriter bufferedWriter = null;
+
+        try {
+            outputStream = urlConnection.getOutputStream();
+            bufferedWriter = new BufferedWriter(new OutputStreamWriter(outputStream, StandardCharsets.UTF_8));
+            bufferedWriter.write(paramsPost);
+            bufferedWriter.flush();
+        } finally {
+            closeQuietly(bufferedWriter);
+            closeQuietly(outputStream);
+        }
+    }
+
+    /**
+     * Gère les erreurs HTTP
+     */
+    private String handleHttpError(HttpsURLConnection urlConnection, int responseCode) {
+        String errorMessage;
+
+        switch (responseCode) {
+            case HttpsURLConnection.HTTP_NOT_FOUND:
+                errorMessage = "0Service non trouvé (404)";
+                break;
+            case HttpsURLConnection.HTTP_INTERNAL_ERROR:
+                errorMessage = "0Erreur interne du serveur (500)";
+                break;
+            case HttpsURLConnection.HTTP_UNAVAILABLE:
+                errorMessage = "0Service temporairement indisponible (503)";
+                break;
+            case HttpsURLConnection.HTTP_UNAUTHORIZED:
+                errorMessage = "0Non autorisé (401)";
+                break;
+            case HttpsURLConnection.HTTP_FORBIDDEN:
+                errorMessage = "0Accès interdit (403)";
+                break;
+            default:
+                errorMessage = "0Erreur HTTP: " + responseCode;
+        }
+
+        // Lecture du corps de la réponse d'erreur
+        String errorBody = readErrorBody(urlConnection);
+        if (errorBody != null && !errorBody.isEmpty()) {
+            logWarning("Corps de la réponse d'erreur: " + errorBody, "error_body");
+        }
+
+        logWarning(errorMessage, "http_error");
+        return errorMessage;
+    }
+
+    /**
+     * Lit le corps de la réponse d'erreur
+     */
+    private String readErrorBody(HttpsURLConnection urlConnection) {
+        InputStream errorStream = null;
+        try {
+            errorStream = urlConnection.getErrorStream();
+            if (errorStream != null) {
+                return readStream(errorStream);
+            }
+        } catch (Exception e) {
+            logException(e, "error_reading_error_stream", "Erreur lors de la lecture du flux d'erreur");
+        } finally {
+            closeQuietly(errorStream);
+        }
+        return null;
+    }
+
+    /**
+     * Gère les exceptions lors de la connexion
+     */
+    private String handleConnectionException(Exception e) {
+        if (e instanceof SocketTimeoutException) {
+            logException(e, "timeout", "Timeout lors de la connexion au serveur");
+            return "0Temps d'attente dépassé";
+        } else if (e instanceof UnknownHostException) {
+            logException(e, "unknown_host", "Hôte inconnu");
+            return "0Serveur non trouvé";
+        } else if (e instanceof SSLException) {
+            logException(e, "ssl_error", "Erreur SSL");
+            return "0Erreur de sécurité lors de la connexion";
+        } else if (e instanceof IOException) {
+            logException(e, "io_error", "Erreur d'E/S");
+            return "0Erreur de communication";
+        } else {
+            logException(e, "unexpected_exception", "Exception inattendue");
+            return "0Erreur inattendue: " + e.getMessage();
+        }
+    }
+
+    /**
+     * Ferme la connexion HTTP de manière sécurisée
+     */
+    private void closeConnection(HttpsURLConnection urlConnection) {
+        if (urlConnection != null) {
+            try {
+                urlConnection.disconnect();
+            } catch (Exception e) {
+                logException(e, "disconnect_error", "Erreur lors de la déconnexion");
+            }
+        }
+    }
+
+    /**
+     * Lit le flux d'entrée
+     */
     private String readStream(InputStream in) {
         if (in == null) {
-            crashlytics.log("Stream d'entrée null dans readStream");
-            Log.e(TAG, "Stream d'entrée null dans readStream");
-
-            Bundle errorParams = new Bundle();
-            errorParams.putString("error_type", "null_stream");
-            errorParams.putString("class", "HttpTask");
-            analytics.logEvent("readStream_null_stream", errorParams);
-
+            logWarning("Stream d'entrée null dans readStream", "null_stream");
             return null;
         }
 
@@ -513,65 +449,47 @@ public class HttpTask {
                 result.setLength(result.length() - 1);
             }
 
-            crashlytics.log("Stream lu avec succès, taille: " + result.length() + " octets");
+            logInfo("Stream lu avec succès, taille: " + result.length() + " octets", "stream_read");
             return result.toString();
         } catch (IOException e) {
-            crashlytics.recordException(e);
-            crashlytics.log("Erreur lors de la lecture du flux: " + e.getMessage());
-            Log.e(TAG, "Erreur lors de la lecture du flux", e);
-
-            Bundle errorParams = new Bundle();
-            errorParams.putString("error_type", "read_error");
-            errorParams.putString("class", "HttpTask");
-            errorParams.putString("error_message", e.getMessage());
-            analytics.logEvent("readStream_read_error", errorParams);
-
+            logException(e, "read_error", "Erreur lors de la lecture du flux");
             return null;
         } finally {
-            if (reader != null) {
-                try {
-                    reader.close();
-                } catch (IOException e) {
-                    crashlytics.recordException(e);
-                    Log.e(TAG, "Erreur lors de la fermeture du lecteur", e);
+            closeQuietly(reader);
+        }
+    }
 
-                    Bundle errorParams = new Bundle();
-                    errorParams.putString("error_type", "close_error");
-                    errorParams.putString("class", "HttpTask");
-                    errorParams.putString("error_message", e.getMessage());
-                    analytics.logEvent("readStream_close_error", errorParams);
-                }
+
+
+    /**
+     * Ferme silencieusement une ressource Closeable
+     */
+    private void closeQuietly(Closeable closeable) {
+        if (closeable != null) {
+            try {
+                closeable.close();
+            } catch (IOException e) {
+                logException(e, "close_error", "Erreur lors de la fermeture d'une ressource");
             }
         }
     }
 
+    /**
+     * Vérifie si une connexion réseau est disponible
+     */
     private boolean isNetworkAvailable() {
         try {
             ConnectivityManager connectivityManager = (ConnectivityManager) context.getSystemService(Context.CONNECTIVITY_SERVICE);
 
             if (connectivityManager == null) {
-                crashlytics.log("ConnectivityManager est null");
-                Log.e(TAG, "ConnectivityManager est null");
-
-                Bundle errorParams = new Bundle();
-                errorParams.putString("error_type", "null_connectivity_manager");
-                errorParams.putString("class", "HttpTask");
-                analytics.logEvent("isNetworkAvailable_connectivity_manager", errorParams);
-
+                logWarning("ConnectivityManager est null", "null_connectivity_manager");
                 return false;
             }
 
             NetworkCapabilities networkCapabilities = connectivityManager.getNetworkCapabilities(connectivityManager.getActiveNetwork());
 
             if (networkCapabilities == null) {
-                crashlytics.log("Aucune capacité réseau détectée");
-                Log.e(TAG, "Aucune capacité réseau détectée");
-
-                Bundle errorParams = new Bundle();
-                errorParams.putString("error_type", "null_network_capabilities");
-                errorParams.putString("class", "HttpTask");
-                analytics.logEvent("isNetworkAvailable_network_capabilities", errorParams);
-
+                logWarning("Aucune capacité réseau détectée", "null_network_capabilities");
                 return false;
             }
 
@@ -579,22 +497,85 @@ public class HttpTask {
             boolean hasCellular = networkCapabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR);
 
             boolean isAvailable = hasWifi || hasCellular;
-            crashlytics.log("État du réseau - WiFi: " + hasWifi + ", Cellulaire: " + hasCellular);
-            Log.d(TAG, "État du réseau - WiFi: " + hasWifi + ", Cellulaire: " + hasCellular);
+            logInfo("État du réseau - WiFi: " + hasWifi + ", Cellulaire: " + hasCellular, "network_state");
 
             return isAvailable;
         } catch (Exception e) {
-            crashlytics.recordException(e);
-            crashlytics.log("Erreur lors de la vérification de la disponibilité du réseau: " + e.getMessage());
-            Log.e(TAG, "Erreur lors de la vérification de la disponibilité du réseau", e);
-
-            Bundle errorParams = new Bundle();
-            errorParams.putString("error_type", "network_check_error");
-            errorParams.putString("class", "HttpTask");
-            errorParams.putString("error_message", e.getMessage());
-            analytics.logEvent("isNetworkAvailable_network_check_error", errorParams);
-
+            logException(e, "network_check_error", "Erreur lors de la vérification de la disponibilité du réseau");
             return false;
+        }
+    }
+
+//********* LOGGING METHODS
+
+    private void logInfo(String message, String infoType) {
+        try {
+            crashlytics.log("INFO: " + message);
+            Log.i(TAG, message);
+
+            Bundle params = new Bundle();
+            params.putString("info_type", infoType);
+            params.putString("class", "HttpTask");
+            params.putString("info_message", message);
+            if (analytics != null) {
+                analytics.logEvent("app_info", params);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error in logInfo: " + e.getMessage());
+        }
+    }
+
+    private void logWarning(String message, String warningType) {
+        try {
+            crashlytics.log("WARNING: " + message);
+            Log.w(TAG, message);
+
+            Bundle params = new Bundle();
+            params.putString("warning_type", warningType);
+            params.putString("class", "HttpTask");
+            params.putString("warning_message", message);
+            if (analytics != null) {
+                analytics.logEvent("app_warning", params);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error in logWarning: " + e.getMessage());
+        }
+    }
+
+    private void logError(String message, String errorType) {
+        try {
+            crashlytics.log("ERROR: " + message);
+            Log.e(TAG, message);
+
+            Bundle params = new Bundle();
+            params.putString("error_type", errorType);
+            params.putString("class", "HttpTask");
+            params.putString("error_message", message);
+            if (analytics != null) {
+                analytics.logEvent("app_error", params);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error in logError: " + e.getMessage());
+        }
+    }
+
+    private void logException(Exception e, String errorType, String context) {
+        try {
+            crashlytics.recordException(e);
+            String errorMessage = e.getMessage() != null ? e.getMessage() : "No message";
+            crashlytics.log("EXCEPTION: " + context + ": " + errorMessage);
+            Log.e(TAG, context + ": " + errorMessage, e);
+
+            Bundle params = new Bundle();
+            params.putString("error_type", errorType);
+            params.putString("class", "HttpTask");
+            params.putString("error_message", errorMessage);
+            params.putString("error_context", context);
+            if (analytics != null) {
+                analytics.logEvent("app_exception", params);
+            }
+        } catch (Exception loggingEx) {
+            Log.e(TAG, "Error in logException: " + loggingEx.getMessage());
         }
     }
 

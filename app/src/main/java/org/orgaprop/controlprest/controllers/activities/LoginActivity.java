@@ -1,5 +1,7 @@
 package org.orgaprop.controlprest.controllers.activities;
 
+import static org.orgaprop.controlprest.controllers.activities.MainActivity.SPLASH_SCREEN_DELAY;
+
 import android.Manifest;
 import android.content.Intent;
 import android.content.SharedPreferences;
@@ -7,6 +9,8 @@ import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.util.Log;
 import android.view.View;
 import android.view.inputmethod.InputMethodManager;
@@ -15,12 +19,14 @@ import android.widget.EditText;
 import android.widget.LinearLayout;
 
 import androidx.annotation.NonNull;
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.constraintlayout.widget.ConstraintLayout;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
 import java.io.UnsupportedEncodingException;
+import java.lang.ref.WeakReference;
 import java.net.URLEncoder;
 import java.util.StringTokenizer;
 import java.util.concurrent.CompletableFuture;
@@ -36,13 +42,15 @@ import org.orgaprop.controlprest.utils.AndyUtils;
 import org.orgaprop.controlprest.utils.ToastManager;
 import org.orgaprop.controlprest.services.PreferencesManager;
 
+
+
 public class LoginActivity extends AppCompatActivity {
 
 //********* PRIVATE VARIABLES
 
     private static final String TAG = "LoginActivity";
 
-    private static LoginActivity mLoginActivity;
+    private static WeakReference<LoginActivity> mLoginActivityRef;
 
     private SharedPreferences preferences;
     private PreferencesManager preferencesManager;
@@ -52,6 +60,9 @@ public class LoginActivity extends AppCompatActivity {
     private String password;
     private FirebaseCrashlytics crashlytics;
     private FirebaseAnalytics analytics;
+    private Handler timeoutHandler;
+    private AlertDialog myDialog;
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
 
 //********* PUBLIC VARIABLES
 
@@ -71,6 +82,7 @@ public class LoginActivity extends AppCompatActivity {
     public static final String PREF_KEY_CLT = "clt";
 
     public static final int UPDATE_REQUEST_CODE = 100;
+    private static final int CONNECTION_TIMEOUT_MS = 30000;
 
     public static final String ACCESS_CODE = "controlprest";
 
@@ -90,6 +102,8 @@ public class LoginActivity extends AppCompatActivity {
             crashlytics.setCustomKey("deviceManufacturer", Build.MANUFACTURER);
             crashlytics.log("LoginActivity démarrée");
 
+            Log.i(TAG, "LoginActivity démarrée");
+
             analytics = FirebaseAnalytics.getInstance(this);
 
             Bundle screenViewParams = new Bundle();
@@ -101,8 +115,9 @@ public class LoginActivity extends AppCompatActivity {
             setContentView(binding.getRoot());
 
             // Initialiser les variables
-            mLoginActivity = this;
+            mLoginActivityRef = new WeakReference<>(this);
             isConnecting = new AtomicBoolean(false);
+            timeoutHandler = new Handler(Looper.getMainLooper());
 
             preferences = getSharedPreferences(PREF_NAME_APPLI, MODE_PRIVATE);
             preferencesManager = PreferencesManager.getInstance(this);
@@ -144,7 +159,8 @@ public class LoginActivity extends AppCompatActivity {
             errorParams.putString("error_message", e.getMessage());
             analytics.logEvent("onCreate_app_error", errorParams);
 
-            ToastManager.showError(getString(R.string.erreur_lors_de_l_initialisation_de_l_application));
+            showErrorDialog(getString(R.string.erreur_lors_de_l_initialisation_de_l_application));
+
             finish();
         }
     }
@@ -154,6 +170,7 @@ public class LoginActivity extends AppCompatActivity {
 
         try {
             crashlytics.log("onResume LoginActivity");
+            Log.i(TAG, "onResume LoginActivity");
 
             if (!isConnecting.get()) {
                 testIdentified();
@@ -179,6 +196,7 @@ public class LoginActivity extends AppCompatActivity {
 
         try {
             crashlytics.log("onPostResume LoginActivity");
+            Log.i(TAG, "onPostResume LoginActivity");
 
             if (!isFirst) {
                 if (idMbr.equals("new")) {
@@ -209,6 +227,39 @@ public class LoginActivity extends AppCompatActivity {
             ToastManager.showError(getString(R.string.erreur_lors_du_d_marrage_de_l_application));
         }
     }
+    @Override
+    protected void onPause() {
+        super.onPause();
+        // Nettoyer les ressources si nécessaire
+        cleanupTimeoutHandler();
+    }
+    @Override
+    protected void onDestroy() {
+        try {
+            crashlytics.log("onDestroy LoginActivity");
+            Log.i(TAG, "onDestroy LoginActivity");
+
+            // Annuler toutes les opérations en cours
+            cancelAllPendingOperations();
+
+            // Nettoyer la référence statique
+            if (mLoginActivityRef != null && mLoginActivityRef.get() == this) {
+                mLoginActivityRef.clear();
+            }
+        } catch (Exception e) {
+            crashlytics.recordException(e);
+            Log.e(TAG, "Erreur dans onDestroy", e);
+
+            Bundle errorParams = new Bundle();
+            errorParams.putString("error_type", "app_error");
+            errorParams.putString("class", "LoginActivity");
+            errorParams.putString("method", "onDestroy");
+            errorParams.putString("error_message", e.getMessage());
+            analytics.logEvent("onDestroy_app_error", errorParams);
+        } finally {
+            super.onDestroy();
+        }
+    }
 
 //********* SURCHARGES
 
@@ -218,6 +269,7 @@ public class LoginActivity extends AppCompatActivity {
 
         try {
             crashlytics.log("onRequestPermissionsResult: " + requestCode);
+            Log.i(TAG, "onRequestPermissionsResult: " + requestCode);
 
             if (requestCode == AndyUtils.PERMISSION_REQUEST) {
                 // Vérifier les permissions réseau
@@ -225,7 +277,7 @@ public class LoginActivity extends AppCompatActivity {
                     String msg = getString(R.string.mess_bad_permission_internet);
 
                     crashlytics.log("Permission refusée: " + permissions[0]);
-                    Log.e(TAG, msg);
+                    Log.e(TAG, "Permission refusée: " + permissions[0]);
 
                     Bundle errorParams = new Bundle();
                     errorParams.putString("error_type", "permission_error");
@@ -233,16 +285,17 @@ public class LoginActivity extends AppCompatActivity {
                     errorParams.putString("error_message", msg);
                     analytics.logEvent("onRequestPermissionsResult_network_error", errorParams);
 
-                    ToastManager.showError(msg);
-                    finish();
+                    showErrorDialog(msg);
+
                     return;
                 }
 
                 // Vérifier les permissions de stockage si demandées
                 if (grantResults.length > 1 && grantResults[1] != PackageManager.PERMISSION_GRANTED) {
                     String msg = getString(R.string.mess_bad_permission_write);
+
                     crashlytics.log("Permission refusée: " + permissions[1]);
-                    Log.e(TAG, msg);
+                    Log.e(TAG, "Permission refusée: " + permissions[1]);
 
                     Bundle errorParams = new Bundle();
                     errorParams.putString("error_type", "permission_error");
@@ -270,7 +323,7 @@ public class LoginActivity extends AppCompatActivity {
 //********* PUBLIC FUNCTIONS
 
     public static LoginActivity getInstance() {
-        return mLoginActivity;
+        return mLoginActivityRef != null ? mLoginActivityRef.get() : null;
     }
 
     public void loginActivityActions(View v) {
@@ -291,6 +344,7 @@ public class LoginActivity extends AppCompatActivity {
             String tag = v.getTag().toString();
 
             crashlytics.log("loginActivityActions: " + tag);
+            Log.i(TAG, "loginActivityActions: " + tag);
 
             switch (tag) {
                 case "on":
@@ -338,6 +392,7 @@ public class LoginActivity extends AppCompatActivity {
     private void checkEssentialPermissions() {
         try {
             crashlytics.log("checkEssentialPermissions called");
+            Log.i(TAG, "checkEssentialPermissions called");
 
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.INTERNET) != PackageManager.PERMISSION_GRANTED) {
                 ActivityCompat.requestPermissions(this, new String[]{
@@ -359,6 +414,63 @@ public class LoginActivity extends AppCompatActivity {
         }
     }
 
+    private final Runnable timeoutRunnable = new Runnable() {
+        @Override
+        public void run() {
+            if (isConnecting.getAndSet(false)) {
+                crashlytics.log("Timeout de connexion forcé");
+                Log.w(TAG, "Timeout de connexion forcé");
+
+                Bundle errorParams = new Bundle();
+                errorParams.putString("error_type", "connection_timeout");
+                errorParams.putString("class", "LoginActivity");
+                analytics.logEvent("connection_timeout", errorParams);
+
+                runOnUiThread(() -> {
+                    ToastManager.showError(getString(R.string.mess_timeout));
+                    showWait(false);
+                });
+            }
+        }
+    };
+    private void cancelAllPendingOperations() {
+        try {
+            crashlytics.log("cancelAllPendingOperations called");
+            Log.i(TAG, "cancelAllPendingOperations called");
+
+            // Annuler le timeout
+            cleanupTimeoutHandler();
+
+            // Réinitialiser l'état de connexion
+            isConnecting.set(false);
+        } catch (Exception e) {
+            crashlytics.recordException(e);
+            Log.e(TAG, "Erreur lors de l'annulation des opérations en cours", e);
+
+            Bundle errorParams = new Bundle();
+            errorParams.putString("error_type", "cancel_ops_error");
+            errorParams.putString("class", "LoginActivity");
+            errorParams.putString("error_message", e.getMessage());
+            analytics.logEvent("cancelAllPendingOperations_error", errorParams);
+        }
+    }
+    private void cleanupTimeoutHandler() {
+        try {
+            if (timeoutHandler != null) {
+                timeoutHandler.removeCallbacks(timeoutRunnable);
+            }
+        } catch (Exception e) {
+            crashlytics.recordException(e);
+            Log.e(TAG, "Erreur lors du nettoyage du timeoutHandler", e);
+
+            Bundle errorParams = new Bundle();
+            errorParams.putString("error_type", "cleanup_timeout_error");
+            errorParams.putString("class", "LoginActivity");
+            errorParams.putString("error_message", e.getMessage());
+            analytics.logEvent("cleanupTimeoutHandler_error", errorParams);
+        }
+    }
+
     private void connectMbr() {
         if (isConnecting.getAndSet(true)) {
             String msg = getString(R.string.une_tentative_de_connexion_est_d_j_en_cours);
@@ -376,8 +488,11 @@ public class LoginActivity extends AppCompatActivity {
             return;
         }
 
+        timeoutHandler.postDelayed(timeoutRunnable, CONNECTION_TIMEOUT_MS);
+
         try {
             crashlytics.log("connectMbr called");
+            Log.i(TAG, "connectMbr called");
 
             EditText mUserName = binding.loginActivityUsernameTxt;
             EditText mUserPwd = binding.loginActivityPasswordTxt;
@@ -389,6 +504,7 @@ public class LoginActivity extends AppCompatActivity {
             if (userName.isEmpty() || password.isEmpty()) {
                 String msg = getString(R.string.mess_err_conex);
 
+                cleanupTimeoutHandler();
                 isConnecting.set(false);
 
                 crashlytics.log(msg);
@@ -406,6 +522,7 @@ public class LoginActivity extends AppCompatActivity {
             }
 
             if (!mCheckBox.isChecked()) {
+                cleanupTimeoutHandler();
                 isConnecting.set(false);
 
                 crashlytics.log("Erreur de connexion: non accepté RGPD");
@@ -528,6 +645,7 @@ public class LoginActivity extends AppCompatActivity {
                         });
                     }
                 }).exceptionally(ex -> {
+                    cleanupTimeoutHandler();
                     isConnecting.set(false);
 
                     crashlytics.recordException(ex);
@@ -546,6 +664,7 @@ public class LoginActivity extends AppCompatActivity {
                     return null;
                 });
             } catch (UnsupportedEncodingException e) {
+                cleanupTimeoutHandler();
                 isConnecting.set(false);
 
                 crashlytics.recordException(e);
@@ -560,6 +679,7 @@ public class LoginActivity extends AppCompatActivity {
                 ToastManager.showError(getString(R.string.erreur_d_encodage_des_param_tres));
                 showWait(false);
             } catch (Exception e) {
+                cleanupTimeoutHandler();
                 isConnecting.set(false);
 
                 crashlytics.recordException(e);
@@ -575,6 +695,7 @@ public class LoginActivity extends AppCompatActivity {
                 showWait(false);
             }
         } catch (Exception e) {
+            cleanupTimeoutHandler();
             isConnecting.set(false);
 
             crashlytics.recordException(e);
@@ -605,7 +726,11 @@ public class LoginActivity extends AppCompatActivity {
             return;
         }
 
+        timeoutHandler.postDelayed(timeoutRunnable, CONNECTION_TIMEOUT_MS);
+
         crashlytics.log("deconectMbr called");
+        Log.i(TAG, "deconectMbr called");
+
         showWait(true);
 
         try {
@@ -631,6 +756,7 @@ public class LoginActivity extends AppCompatActivity {
                     if (result == null) {
                         String msg = getString(R.string.erreur_de_communication_avec_le_serveur);
 
+                        cleanupTimeoutHandler();
                         isConnecting.set(false);
 
                         crashlytics.log(msg);
@@ -645,13 +771,13 @@ public class LoginActivity extends AppCompatActivity {
                         runOnUiThread(() -> {
                             ToastManager.showShort(msg);
                             showWait(false);
-                            isConnecting.set(false);
                         });
 
                         return;
                     }
 
                     boolean success = result.startsWith("1");
+
                     crashlytics.log("Déconnexion réussie: " + success);
                     Log.d(TAG, "Déconnexion réussie: " + success);
 
@@ -672,6 +798,7 @@ public class LoginActivity extends AppCompatActivity {
                         finish();
                     });
                 } catch (Exception e) {
+                    cleanupTimeoutHandler();
                     isConnecting.set(false);
 
                     crashlytics.recordException(e);
@@ -690,6 +817,7 @@ public class LoginActivity extends AppCompatActivity {
                     });
                 }
             }).exceptionally(ex -> {
+                cleanupTimeoutHandler();
                 isConnecting.set(false);
 
                 crashlytics.recordException(ex);
@@ -709,6 +837,9 @@ public class LoginActivity extends AppCompatActivity {
                 return null;
             });
         } catch (Exception e) {
+            cleanupTimeoutHandler();
+            isConnecting.set(false);
+
             crashlytics.recordException(e);
             Log.e(TAG, "Erreur lors de la déconnexion", e);
 
@@ -721,7 +852,7 @@ public class LoginActivity extends AppCompatActivity {
             resetUserPreferences();
             ToastManager.showError(getString(R.string.erreur_lors_de_la_d_connexion));
             showWait(false);
-            isConnecting.set(false);
+
             finish();
         }
     }
@@ -729,6 +860,7 @@ public class LoginActivity extends AppCompatActivity {
     private void resetUserPreferences() {
         try {
             crashlytics.log("resetUserPreferences called");
+            Log.i(TAG, "resetUserPreferences called");
 
             EditText mUserName = binding.loginActivityUsernameTxt;
             EditText mUserPwd = binding.loginActivityPasswordTxt;
@@ -767,7 +899,7 @@ public class LoginActivity extends AppCompatActivity {
     private void requestConexion(String m) {
         try {
             crashlytics.log("requestConexion: " + m);
-            Log.d(TAG, "requestConexion: " + m);
+            Log.i(TAG, "requestConexion: " + m);
 
             Intent intent = new Intent(this, GetMailActivity.class);
             intent.putExtra(GetMailActivity.GET_MAIL_ACTIVITY_TYPE, m);
@@ -789,6 +921,7 @@ public class LoginActivity extends AppCompatActivity {
     private void openWebPage() {
         try {
             crashlytics.log("openWebPage called");
+            Log.i(TAG, "openWebPage called");
 
             String url = "https://www.orgaprop.org/ress/protectDonneesPersonnelles.html";
             Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
@@ -810,6 +943,7 @@ public class LoginActivity extends AppCompatActivity {
     private void startAppli(String result) {
         try {
             crashlytics.log("startAppli called");
+            Log.i(TAG, "startAppli called");
 
             if (result == null || result.isEmpty()) {
                 isConnecting.set(false);
@@ -945,6 +1079,7 @@ public class LoginActivity extends AppCompatActivity {
     private void testIdentified() {
         try {
             crashlytics.log("testIdentified called");
+            Log.i(TAG, "testIdentified called");
 
             if (!AndyUtils.isNetworkAvailable(this)) {
                 crashlytics.log("Aucune connexion réseau disponible");
@@ -967,6 +1102,8 @@ public class LoginActivity extends AppCompatActivity {
             adrMac = Build.FINGERPRINT;
 
             if (idMbr == null || idMbr.isEmpty() || idMbr.equals("new") || adrMac == null || adrMac.isEmpty()) {
+                openConexion();
+                showWait(false);
                 return;
             }
 
@@ -990,6 +1127,8 @@ public class LoginActivity extends AppCompatActivity {
             loginParams.putString("adr_mac", adrMac);
             analytics.logEvent("testIdentified_login_result", loginParams);
 
+            timeoutHandler.postDelayed(timeoutRunnable, CONNECTION_TIMEOUT_MS);
+
             CompletableFuture<String> futureResult = task.executeHttpTask(
                     HttpTask.HTTP_TASK_ACT_CONEX,
                     HttpTask.HTTP_TASK_CBL_TEST,
@@ -998,6 +1137,8 @@ public class LoginActivity extends AppCompatActivity {
 
             futureResult.thenAccept(result -> {
                 try {
+                    cleanupTimeoutHandler();
+
                     crashlytics.log("Résultat de testIdentified: " + result);
                     Log.d(TAG, "Résultat de testIdentified: " + result);
 
@@ -1037,6 +1178,7 @@ public class LoginActivity extends AppCompatActivity {
                         });
                     }
                 } catch (Exception e) {
+                    cleanupTimeoutHandler();
                     isConnecting.set(false);
 
                     crashlytics.recordException(e);
@@ -1055,6 +1197,7 @@ public class LoginActivity extends AppCompatActivity {
                     });
                 }
             }).exceptionally(ex -> {
+                cleanupTimeoutHandler();
                 isConnecting.set(false);
 
                 crashlytics.recordException(ex);
@@ -1074,6 +1217,7 @@ public class LoginActivity extends AppCompatActivity {
                 return null;
             });
         } catch (Exception e) {
+            cleanupTimeoutHandler();
             isConnecting.set(false);
 
             crashlytics.recordException(e);
@@ -1096,6 +1240,7 @@ public class LoginActivity extends AppCompatActivity {
     private void openConexion() {
         try {
             crashlytics.log("openConexion called");
+            Log.i(TAG, "openConexion called");
 
             ConstraintLayout mLayoutConnect = binding.loginActivityConnectLyt;
             LinearLayout mLayoutDeco = binding.loginActivityDecoLyt;
@@ -1126,6 +1271,7 @@ public class LoginActivity extends AppCompatActivity {
     private void openDeco() {
         try {
             crashlytics.log("openDeco called");
+            Log.i(TAG, "openDeco called");
 
             ConstraintLayout mLayoutConnect = binding.loginActivityConnectLyt;
             LinearLayout mLayoutDeco = binding.loginActivityDecoLyt;
@@ -1148,6 +1294,7 @@ public class LoginActivity extends AppCompatActivity {
     private void openVersion() {
         try {
             crashlytics.log("openVersion called");
+            Log.i(TAG, "openVersion called");
 
             ConstraintLayout mLayoutConnect = binding.loginActivityConnectLyt;
             LinearLayout mLayoutDeco = binding.loginActivityDecoLyt;
@@ -1173,6 +1320,7 @@ public class LoginActivity extends AppCompatActivity {
     private void showWait(Boolean b) {
         try {
             crashlytics.log("showWait called");
+            Log.i(TAG, "showWait called");
 
             pl.droidsonroids.gif.GifImageView mWaitImg = binding.loginActivityWaitImg;
 
@@ -1205,6 +1353,7 @@ public class LoginActivity extends AppCompatActivity {
     private void hideKeyboard() {
         try {
             crashlytics.log("hideKeyboard called");
+            Log.i(TAG, "hideKeyboard called");
 
             View currentFocus = getCurrentFocus();
             if (currentFocus != null) {
@@ -1222,6 +1371,38 @@ public class LoginActivity extends AppCompatActivity {
             errorParams.putString("class", "LoginActivity");
             errorParams.putString("error_message", e.getMessage());
             analytics.logEvent("hideKeyboard_app_error", errorParams);
+        }
+    }
+
+    /**
+     * Affiche un dialogue d'erreur
+     */
+    private void showErrorDialog(String message) {
+        try {
+            crashlytics.log("showErrorDialog: " + message);
+            Log.i(TAG, "showErrorDialog: " + message);
+
+            AlertDialog.Builder builder = new AlertDialog.Builder(this);
+            builder.setTitle("Erreur")
+                    .setMessage(message)
+                    .setCancelable(false)
+                    .setPositiveButton("Fermer", (dialog, which) -> finish());
+
+            myDialog = builder.create();
+            myDialog.show();
+        } catch (Exception e) {
+            crashlytics.recordException(e);
+            Log.e(TAG, "Erreur lors de l'affichage du dialogue d'erreur", e);
+
+            Bundle errorParams = new Bundle();
+            errorParams.putString("error_type", "dialog_error");
+            errorParams.putString("class", "MainActivity");
+            errorParams.putString("error_message", e.getMessage());
+            analytics.logEvent("showErrorDialog_app_error", errorParams);
+
+            ToastManager.showError(message);
+
+            mainHandler.postDelayed(this::finish, SPLASH_SCREEN_DELAY);
         }
     }
 

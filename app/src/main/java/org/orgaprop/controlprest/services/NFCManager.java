@@ -14,17 +14,19 @@ import android.nfc.tech.Ndef;
 import android.nfc.tech.NdefFormatable;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.util.Log;
-
-import com.google.firebase.analytics.FirebaseAnalytics;
-import com.google.firebase.crashlytics.FirebaseCrashlytics;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.Locale;
 
-import org.orgaprop.controlprest.utils.ToastManager;
+import com.google.firebase.analytics.FirebaseAnalytics;
+import com.google.firebase.crashlytics.FirebaseCrashlytics;
+
+import org.orgaprop.controlprest.R;
 
 
 
@@ -37,6 +39,26 @@ public class NFCManager {
     private NfcAdapter nfcAdpt;
     private FirebaseCrashlytics crashlytics;
     private FirebaseAnalytics analytics;
+
+    private static final int NFC_OPERATION_TIMEOUT = 10000;
+    private final Handler handler = new Handler(Looper.getMainLooper());
+
+    public interface NFCCallback {
+        void onSuccess(String message);
+        void onError(String errorMessage);
+    }
+
+    private final NFCCallback defaultCallback = new NFCCallback() {
+        @Override
+        public void onSuccess(String message) {
+            logInfo(message, "nfc_success");
+        }
+
+        @Override
+        public void onError(String errorMessage) {
+            logError(errorMessage, "nfc_error");
+        }
+    };
 
 //********* PUBLIC CLASSES
 
@@ -52,63 +74,43 @@ public class NFCManager {
     }
     public static class NFCTagReadOnly extends Exception {
         public NFCTagReadOnly() {
-            super("Le tag NFC est en lecture seule");
+            super();
         }
     }
     public static class NFCTagCapacityExceeded extends Exception {
         public NFCTagCapacityExceeded() {
-            super("La capacité du tag NFC a été dépassée");
+            super();
+        }
+    }
+    public static class NFCOperationTimeout extends Exception {
+        public NFCOperationTimeout() {
+            super();
         }
     }
 
 //********* CONSTRUCTORS
 
     public NFCManager(Activity activity) {
+        if (activity == null) {
+            throw new IllegalArgumentException("Activity cannot be null");
+        }
+
+        this.activity = activity;
+
         try {
-            if (activity == null) {
-                throw new IllegalArgumentException("L'activité ne peut pas être nulle");
-            }
-            this.activity = activity;
-
-            // Initialiser Crashlytics
+            // Initialiser Crashlytics et Analytics une seule fois
             this.crashlytics = FirebaseCrashlytics.getInstance();
-            crashlytics.log("NFCManager initialisé");
-            crashlytics.setCustomKey("deviceModel", Build.MODEL);
-            crashlytics.setCustomKey("deviceManufacturer", Build.MANUFACTURER);
-
             this.analytics = FirebaseAnalytics.getInstance(activity);
 
-            Bundle screenViewParams = new Bundle();
-            screenViewParams.putString(FirebaseAnalytics.Param.SCREEN_NAME, "NFCManager");
-            screenViewParams.putString(FirebaseAnalytics.Param.SCREEN_CLASS, "NFCManager");
-            analytics.logEvent(FirebaseAnalytics.Event.SCREEN_VIEW, screenViewParams);
+            logInfo("NFCManager initialized", "init");
+
+            // Ajouter des données de contexte utiles
+            crashlytics.setCustomKey("deviceModel", Build.MODEL);
+            crashlytics.setCustomKey("deviceManufacturer", Build.MANUFACTURER);
         } catch (Exception e) {
-            Log.e(TAG, "Erreur lors de l'initialisation de NFCManager", e);
-            FirebaseCrashlytics.getInstance();
+            Log.e(TAG, "Error initializing NFCManager", e);
             FirebaseCrashlytics.getInstance().recordException(e);
-
-            if (activity != null) {
-                try {
-                    this.analytics = FirebaseAnalytics.getInstance(activity);
-
-                    Bundle screenViewParams = new Bundle();
-                    screenViewParams.putString(FirebaseAnalytics.Param.SCREEN_NAME, "NFCManager");
-                    screenViewParams.putString(FirebaseAnalytics.Param.SCREEN_CLASS, "NFCManager");
-                    analytics.logEvent(FirebaseAnalytics.Event.SCREEN_VIEW, screenViewParams);
-
-                    Bundle errorParams = new Bundle();
-                    errorParams.putString("error_type", "app_error");
-                    errorParams.putString("class", "NFCManager");
-                    errorParams.putString("message", e.getMessage());
-                    analytics.logEvent("NFCManager_app_error", errorParams);
-                } catch (Exception analyticsEx) {
-                    Log.e(TAG, "Exception dans onCreate analytics: " + analyticsEx.getMessage(), analyticsEx);
-                }
-            }
-
-            ToastManager.showError("Erreur lors de l'initialisation de NFCManager");
-
-            throw e;
+            throw new RuntimeException("Failed to initialize NFCManager", e);
         }
     }
 
@@ -120,84 +122,48 @@ public class NFCManager {
      * @throws NFCNotEnabled si NFC est supporté mais non activé
      */
     public void verifyNFC() throws NFCNotSupported, NFCNotEnabled {
-        try {
-            crashlytics.log("verifyNFC called");
+        logInfo("Verifying NFC availability", "nfc_verify");
 
-            nfcAdpt = NfcAdapter.getDefaultAdapter(activity);
+        nfcAdpt = NfcAdapter.getDefaultAdapter(activity);
 
-            if (nfcAdpt == null) {
-                crashlytics.log("NFC non supporté sur cet appareil");
-
-                Bundle errorParams = new Bundle();
-                errorParams.putString("error_type", "not_supported");
-                errorParams.putString("class", "NFCManager");
-                analytics.logEvent("verifyNFC_not_supported", errorParams);
-
-                ToastManager.showError("NFC non supporté sur cet appareil");
-
-                throw new NFCNotSupported();
-            }
-            if (!nfcAdpt.isEnabled()) {
-                crashlytics.log("NFC désactivé sur cet appareil");
-
-                Bundle errorParams = new Bundle();
-                errorParams.putString("error_type", "not_enabled");
-                errorParams.putString("class", "NFCManager");
-                analytics.logEvent("verifyNFC_not_enabled", errorParams);
-
-                ToastManager.showError("NFC désactivé sur cet appareil");
-
-                throw new NFCNotEnabled();
-            }
-
-            crashlytics.log("NFC vérifié avec succès");
-        } catch (Exception e) {
-            if (e instanceof NFCNotSupported || e instanceof NFCNotEnabled) {
-                crashlytics.log("Exception NFC spécifique: " + e.getClass().getSimpleName());
-
-                Bundle errorParams = new Bundle();
-                errorParams.putString("error_type", e.getClass().getSimpleName());
-                errorParams.putString("class", "NFCManager");
-                errorParams.putString("message", e.getMessage());
-                analytics.logEvent("verifyNFC_specific_exception", errorParams);
-
-                throw e;
-            }
-            crashlytics.recordException(e);
-            crashlytics.log("Erreur lors de la vérification NFC: " + e.getMessage());
-            Log.e(TAG, "Erreur lors de la vérification NFC: " + e.getMessage(), e);
-
-            Bundle errorParams = new Bundle();
-            errorParams.putString("error_type", "generic_exception");
-            errorParams.putString("class", "NFCManager");
-            errorParams.putString("message", e.getMessage());
-            analytics.logEvent("verifyNFC_generic_exception", errorParams);
-
-            ToastManager.showError("Erreur lors de la vérification NFC");
-            throw new RuntimeException("Erreur lors de la vérification NFC", e);
+        if (nfcAdpt == null) {
+            logError("NFC not supported on this device", "nfc_not_supported");
+            throw new NFCNotSupported();
         }
+
+        if (!nfcAdpt.isEnabled()) {
+            logError("NFC is disabled on this device", "nfc_not_enabled");
+            throw new NFCNotEnabled();
+        }
+
+        logInfo("NFC verified successfully", "nfc_verify_success");
     }
 
     /**
      * Active l'expédition NFC en premier plan pour l'activité
      */
-    public void enableDispatch() {
-        try {
-            crashlytics.log("enableDispatch called");
+    public void enableDispatch(NFCCallback callback) {
+        NFCCallback effectiveCallback = callback != null ? callback : defaultCallback;
 
-            if (nfcAdpt == null) {
-                crashlytics.log("L'adaptateur NFC est null lors de l'activation de l'expédition");
-                Log.e(TAG, "L'adaptateur NFC est null lors de l'activation de l'expédition");
+        logInfo("Enabling NFC foreground dispatch", "nfc_enable_dispatch");
 
-                Bundle errorParams = new Bundle();
-                errorParams.putString("error_type", "null_adapter");
-                errorParams.putString("class", "NFCManager");
-                analytics.logEvent("enableDispatch_null_adapter", errorParams);
-
-                ToastManager.showError("Erreur lors de l'activation de l'expédition NFC");
+        if (nfcAdpt == null) {
+            try {
+                nfcAdpt = NfcAdapter.getDefaultAdapter(activity);
+                if (nfcAdpt == null) {
+                    String errorMsg = activity.getString(R.string.mess_bad_nfc);
+                    logError("NFC adapter is null when enabling dispatch", "null_adapter");
+                    effectiveCallback.onError(errorMsg);
+                    return;
+                }
+            } catch (Exception e) {
+                logException(e, "nfc_init_error", "Error initializing NFC adapter");
+                effectiveCallback.onError(activity.getString(R.string.erreur_d_activation_nfc));
                 return;
             }
+        }
 
+        try {
             Intent nfcIntent = new Intent(activity, activity.getClass());
             nfcIntent.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP);
 
@@ -213,297 +179,216 @@ public class NFCManager {
             };
 
             nfcAdpt.enableForegroundDispatch(activity, pendingIntent, intentFiltersArray, techList);
-            crashlytics.log("NFC Foreground Dispatch activé");
+            logInfo("NFC Foreground Dispatch enabled", "nfc_dispatch_enabled");
+            effectiveCallback.onSuccess("NFC ready");
         } catch (Exception e) {
-            crashlytics.recordException(e);
-            crashlytics.log("Erreur lors de l'activation de l'expédition NFC: " + e.getMessage());
-            Log.e(TAG, "Erreur lors de l'activation de l'expédition NFC: " + e.getMessage(), e);
-
-            Bundle errorParams = new Bundle();
-            errorParams.putString("error_type", "generic_exception");
-            errorParams.putString("class", "NFCManager");
-            errorParams.putString("message", e.getMessage());
-            analytics.logEvent("enableDispatch_app_error", errorParams);
-
-            ToastManager.showError("Erreur lors de l'activation de l'expédition NFC");
+            logException(e, "enable_dispatch_error", "Error enabling NFC dispatch");
+            effectiveCallback.onError(activity.getString(R.string.erreur_d_activation_nfc));
         }
+    }
+
+    /**
+     * Version simplifiée de enableDispatch sans callback
+     */
+    public void enableDispatch() {
+        enableDispatch(null);
     }
 
     /**
      * Désactive l'expédition NFC en premier plan
      */
     public void disableDispatch() {
-        try {
-            crashlytics.log("disableDispatch called");
+        logInfo("Disabling NFC foreground dispatch", "nfc_disable_dispatch");
 
-            if (nfcAdpt != null) {
+        if (nfcAdpt != null) {
+            try {
                 nfcAdpt.disableForegroundDispatch(activity);
-                crashlytics.log("NFC Foreground Dispatch désactivé");
-            } else {
-                crashlytics.log("Impossible de désactiver NFC Dispatch: adaptateur null");
-                Log.e(TAG, "Impossible de désactiver NFC Dispatch: adaptateur null");
-
-                Bundle errorParams = new Bundle();
-                errorParams.putString("error_type", "null_adapter");
-                errorParams.putString("class", "NFCManager");
-                analytics.logEvent("disableDispatch_null_adapter", errorParams);
+                logInfo("NFC Foreground Dispatch disabled", "nfc_dispatch_disabled");
+            } catch (Exception e) {
+                logException(e, "disable_dispatch_error", "Error disabling NFC dispatch");
+                // Ne pas lancer d'exception car cette méthode est souvent appelée dans onPause
             }
-        } catch (Exception e) {
-            crashlytics.recordException(e);
-            crashlytics.log("Erreur lors de la désactivation de l'expédition NFC: " + e.getMessage());
-            Log.e(TAG, "Erreur lors de la désactivation de l'expédition NFC: " + e.getMessage(), e);
-
-            Bundle errorParams = new Bundle();
-            errorParams.putString("error_type", "generic_exception");
-            errorParams.putString("class", "NFCManager");
-            errorParams.putString("message", e.getMessage());
-            analytics.logEvent("disableDispatch_app_error", errorParams);
-
-            ToastManager.showError("Erreur lors de la désactivation de l'expédition NFC");
+        } else {
+            logWarning("Cannot disable NFC Dispatch: adapter is null", "null_adapter");
         }
     }
 
     /**
-     * Écrit un message NDEF sur un tag NFC
+     * Écrit un message NDEF sur un tag NFC avec timeout et gestion d'erreurs améliorée
      * @param tag Tag NFC à écrire
      * @param message Message NDEF à écrire
      * @param makeReadOnly Rendre le tag en lecture seule après l'écriture
+     * @param callback Callback pour les résultats de l'opération
      * @return true si l'écriture a réussi
      * @throws IOException si une erreur d'E/S se produit
      * @throws FormatException si le message est mal formaté
      * @throws NFCTagReadOnly si le tag est en lecture seule
      * @throws NFCTagCapacityExceeded si le message dépasse la capacité du tag
+     * @throws NFCOperationTimeout si l'opération prend trop de temps
      */
-    public boolean writeTag(Tag tag, NdefMessage message, boolean makeReadOnly)
-            throws IOException, FormatException, NFCTagReadOnly, NFCTagCapacityExceeded {
+    public boolean writeTag(Tag tag, NdefMessage message, boolean makeReadOnly, NFCCallback callback)
+            throws IOException, FormatException, NFCTagReadOnly, NFCTagCapacityExceeded, NFCOperationTimeout {
+
+        NFCCallback effectiveCallback = callback != null ? callback : defaultCallback;
+
+        // Validation des entrées
+        if (tag == null) {
+            logError("Tag is null", "null_tag");
+            effectiveCallback.onError(activity.getString(R.string.erreur_lors_de_l_criture_du_tag_veuillez_r_essayer));
+            throw new IllegalArgumentException("Tag cannot be null");
+        }
+
+        if (message == null) {
+            logError("Message is null", "null_message");
+            effectiveCallback.onError(activity.getString(R.string.erreur_lors_de_l_criture_du_tag_veuillez_r_essayer));
+            throw new IllegalArgumentException("Message cannot be null");
+        }
+
+        // Logging et télémétrie
+        String tagId = bytesToHex(tag.getId());
+        crashlytics.setCustomKey("messageSize", message.getByteArrayLength());
+        crashlytics.setCustomKey("makeReadOnly", makeReadOnly);
+        crashlytics.setCustomKey("tagId", tagId);
+
+        logInfo("Writing to NFC tag (ID: " + tagId + "), message size: " + message.getByteArrayLength() + " bytes", "nfc_write");
+
+        // Variables pour la gestion du timeout
+        final boolean[] operationCompleted = {false};
+        final boolean[] operationSuccessful = {false};
+        final Exception[] operationException = {null};
+
+        // Configurer le timeout
+        Runnable timeoutRunnable = () -> {
+            if (!operationCompleted[0]) {
+                operationCompleted[0] = true;
+                logError("NFC operation timed out after " + NFC_OPERATION_TIMEOUT + "ms", "nfc_timeout");
+                effectiveCallback.onError(activity.getString(R.string.erreur_lors_de_l_criture_du_tag_veuillez_r_essayer));
+            }
+        };
+        handler.postDelayed(timeoutRunnable, NFC_OPERATION_TIMEOUT);
+
         try {
-            crashlytics.log("writeTag called");
-
-            if (tag == null) {
-                crashlytics.log("Le tag est null");
-                Log.e(TAG, "Le tag est null");
-
-                Bundle errorParams = new Bundle();
-                errorParams.putString("error_type", "null_tag");
-                errorParams.putString("class", "NFCManager");
-                analytics.logEvent("writeTag_null_tag", errorParams);
-
-                ToastManager.showError("Le tag est null");
-                return false;
-            }
-
-            if (message == null) {
-                crashlytics.log("Le message est null");
-                Log.e(TAG, "Le message est null");
-
-                Bundle errorParams = new Bundle();
-                errorParams.putString("error_type", "null_message");
-                errorParams.putString("class", "NFCManager");
-                analytics.logEvent("writeTag_null_message", errorParams);
-
-                ToastManager.showError("Le message est null");
-                return false;
-            }
-
-            crashlytics.setCustomKey("messageSize", message.getByteArrayLength());
-            crashlytics.setCustomKey("makeReadOnly", makeReadOnly);
-
-            String tagId = bytesToHex(tag.getId());
-            crashlytics.setCustomKey("tagId", tagId);
-            crashlytics.log("Écriture d'un tag (ID: " + tagId + ")");
-
-            Bundle tagParams = new Bundle();
-            tagParams.putString("tagId", tagId);
-            analytics.logEvent("writeTag_tag", tagParams);
-
             Ndef ndefTag = Ndef.get(tag);
 
-            try {
-                if (ndefTag == null) {
-                    // Le tag n'est pas encore au format NDEF
-                    crashlytics.log("Tag non formaté en NDEF, tentative de formatage");
-
-                    NdefFormatable nForm = NdefFormatable.get(tag);
-                    if (nForm == null) {
-                        crashlytics.log("Le tag n'est pas formatable en NDEF");
-                        Log.e(TAG, "Le tag n'est pas formatable en NDEF");
-
-                        Bundle errorParams = new Bundle();
-                        errorParams.putString("error_type", "not_formatable");
-                        errorParams.putString("class", "NFCManager");
-                        analytics.logEvent("writeTag_not_formatable", errorParams);
-
-                        ToastManager.showError("Le tag n'est pas formatable en NDEF");
-                        return false;
-                    }
-
-                    try {
-                        nForm.connect();
-                        nForm.format(message);
-                        crashlytics.log("Tag formaté et écrit avec succès");
-                        Log.d(TAG, "Tag formaté et écrit avec succès");
-
-                        Bundle tagParams2 = new Bundle();
-                        tagParams2.putString("tagId", tagId);
-                        analytics.logEvent("writeTag_tag", tagParams2);
-
-                        ToastManager.showShort("Tag formaté et écrit avec succès");
-                        return true;
-                    } finally {
-                        try {
-                            nForm.close();
-                        } catch (Exception e) {
-                            crashlytics.recordException(e);
-                            Log.e(TAG, "Erreur lors de la fermeture du formateur NDEF: " + e.getMessage(), e);
-
-                            Bundle errorParams = new Bundle();
-                            errorParams.putString("error_type", "close_form_exception");
-                            errorParams.putString("class", "NFCManager");
-                            errorParams.putString("message", e.getMessage());
-                            analytics.logEvent("writeTag_close_form_exception", errorParams);
-
-                            ToastManager.showError("Erreur lors de la fermeture du formateur NDEF");
-                        }
-                    }
-                } else {
-                    try {
-                        crashlytics.log("Tag NDEF détecté, connexion...");
-                        ndefTag.connect();
-
-                        if (!ndefTag.isWritable()) {
-                            crashlytics.log("Tag en lecture seule");
-                            Log.e(TAG, "Le tag est en lecture seule");
-
-                            Bundle errorParams = new Bundle();
-                            errorParams.putString("error_type", "read_only");
-                            errorParams.putString("class", "NFCManager");
-                            analytics.logEvent("writeTag_read_only", errorParams);
-
-                            ToastManager.showError("Le tag est en lecture seule");
-
-                            throw new NFCTagReadOnly();
-                        }
-
-                        int maxSize = ndefTag.getMaxSize();
-                        int messageSize = message.getByteArrayLength();
-                        crashlytics.log("Taille maximale du tag: " + maxSize + ", taille du message: " + messageSize);
-
-                        if (maxSize < messageSize) {
-                            crashlytics.log("Capacité du tag dépassée");
-                            Log.e(TAG, "La capacité du tag a été dépassée");
-
-                            Bundle errorParams = new Bundle();
-                            errorParams.putString("error_type", "capacity_exceeded");
-                            errorParams.putString("class", "NFCManager");
-                            analytics.logEvent("writeTag_capacity_exceeded", errorParams);
-
-                            ToastManager.showError("La capacité du tag a été dépassée");
-
-                            throw new NFCTagCapacityExceeded();
-                        }
-
-                        ndefTag.writeNdefMessage(message);
-                        crashlytics.log("Message NDEF écrit avec succès");
-                        Log.d(TAG, "Tag écrit avec succès");
-
-                        if (makeReadOnly) {
-                            if (ndefTag.canMakeReadOnly()) {
-                                ndefTag.makeReadOnly();
-                                crashlytics.log("Tag mis en lecture seule");
-                            } else {
-                                crashlytics.log("Ce tag ne supporte pas le mode lecture seule");
-                                Log.w(TAG, "Ce tag ne supporte pas le mode lecture seule");
-
-                                Bundle errorParams = new Bundle();
-                                errorParams.putString("error_type", "read_only_not_supported");
-                                errorParams.putString("class", "NFCManager");
-                                analytics.logEvent("writeTag_read_only_not_supported", errorParams);
-
-                                ToastManager.showShort("Ce tag ne supporte pas le mode lecture seule");
-                            }
-                        }
-
-                        ToastManager.showShort("Tag écrit avec succès");
-                        return true;
-                    } finally {
-                        try {
-                            ndefTag.close();
-                        } catch (Exception e) {
-                            crashlytics.recordException(e);
-                            Log.e(TAG, "Erreur lors de la fermeture du tag NDEF: " + e.getMessage(), e);
-
-                            Bundle errorParams = new Bundle();
-                            errorParams.putString("error_type", "close_tag_exception");
-                            errorParams.putString("class", "NFCManager");
-                            errorParams.putString("message", e.getMessage());
-                            analytics.logEvent("writeTag_close_tag_exception", errorParams);
-
-                            ToastManager.showError("Erreur lors de la fermeture du tag NDEF");
-                        }
-                    }
+            if (ndefTag == null) {
+                // Le tag n'est pas encore au format NDEF, essayer de le formater
+                NdefFormatable nForm = NdefFormatable.get(tag);
+                if (nForm == null) {
+                    logError("Tag is not NDEF formattable", "not_formatable");
+                    effectiveCallback.onError(activity.getString(R.string.format_de_tag_non_compatible));
+                    return false;
                 }
-            } catch (TagLostException e) {
-                crashlytics.recordException(e);
-                crashlytics.log("Le tag a été perdu pendant l'écriture");
-                Log.e(TAG, "Le tag a été perdu pendant l'écriture", e);
 
-                Bundle errorParams = new Bundle();
-                errorParams.putString("error_type", "tag_lost");
-                errorParams.putString("class", "NFCManager");
-                errorParams.putString("message", e.getMessage());
-                analytics.logEvent("writeTag_tag_lost", errorParams);
+                try {
+                    nForm.connect();
+                    nForm.format(message);
+                    operationSuccessful[0] = true;
 
-                ToastManager.showError("Le tag a été retiré pendant l'écriture");
-                throw new IOException("Le tag a été retiré pendant l'écriture", e);
-            } catch (IOException | FormatException e) {
-                crashlytics.recordException(e);
-                crashlytics.log("Erreur lors de l'écriture: " + e.getClass().getSimpleName());
+                    logInfo("Tag formatted and written successfully", "nfc_format_success");
+                    effectiveCallback.onSuccess(activity.getString(R.string.txt_close_tag));
 
-                Bundle errorParams = new Bundle();
-                errorParams.putString("error_type", e.getClass().getSimpleName());
-                errorParams.putString("class", "NFCManager");
-                errorParams.putString("message", e.getMessage());
-                analytics.logEvent("writeTag_error", errorParams);
+                    return true;
+                } finally {
+                    safeClose(nForm);
+                }
+            } else {
+                try {
+                    logInfo("NDEF tag detected, connecting...", "nfc_connect");
+                    ndefTag.connect();
 
-                ToastManager.showError("Erreur lors de l'écriture");
+                    if (!ndefTag.isWritable()) {
+                        logError("Tag is read-only", "read_only");
+                        effectiveCallback.onError(activity.getString(R.string.ce_tag_est_en_lecture_seule_et_ne_peut_pas_tre_modifi));
+                        throw new NFCTagReadOnly();
+                    }
 
-                throw e;
-            } catch (NFCTagReadOnly e) {
-                crashlytics.log("Exception NFCTagReadOnly: " + e.getMessage());
-                throw e;
-            } catch (NFCTagCapacityExceeded e) {
-                crashlytics.log("Exception NFCTagCapacityExceeded: " + e.getMessage());
-                throw e;
-            } catch (Exception e) {
-                crashlytics.recordException(e);
-                crashlytics.log("Erreur inattendue lors de l'écriture du tag: " + e.getMessage());
-                Log.e(TAG, "Erreur inattendue lors de l'écriture du tag: " + e.getMessage(), e);
+                    int maxSize = ndefTag.getMaxSize();
+                    int messageSize = message.getByteArrayLength();
 
-                Bundle errorParams = new Bundle();
-                errorParams.putString("error_type", "unexpected_exception");
-                errorParams.putString("class", "NFCManager");
-                errorParams.putString("message", e.getMessage());
-                analytics.logEvent("writeTag_unexpected_exception", errorParams);
+                    logInfo("Max tag size: " + maxSize + ", message size: " + messageSize, "nfc_size_check");
 
-                ToastManager.showError("Erreur lors de l'écriture du tag");
+                    if (maxSize < messageSize) {
+                        logError("Tag capacity exceeded: " + messageSize + " > " + maxSize, "capacity_exceeded");
+                        effectiveCallback.onError(activity.getString(R.string.ce_tag_est_trop_petit_pour_contenir_les_donn_es));
+                        throw new NFCTagCapacityExceeded();
+                    }
 
-                throw new IOException("Erreur lors de l'écriture du tag", e);
+                    ndefTag.writeNdefMessage(message);
+
+                    if (makeReadOnly && ndefTag.canMakeReadOnly()) {
+                        boolean success = ndefTag.makeReadOnly();
+                        if (success) {
+                            logInfo("Tag made read-only", "nfc_readonly_success");
+                        } else {
+                            logWarning("Failed to make tag read-only", "nfc_readonly_failed");
+                        }
+                    }
+
+                    operationSuccessful[0] = true;
+                    logInfo("NDEF message written successfully", "nfc_write_success");
+                    effectiveCallback.onSuccess(activity.getString(R.string.txt_close_tag));
+
+                    return true;
+                } finally {
+                    safeClose(ndefTag);
+                }
+            }
+        } catch (TagLostException e) {
+            operationException[0] = e;
+            logException(e, "tag_lost", "Tag was lost during writing");
+            effectiveCallback.onError(activity.getString(R.string.erreur_lors_de_l_criture_du_tag_veuillez_r_essayer));
+            throw new IOException("Tag was removed during writing", e);
+        } catch (IOException e) {
+            operationException[0] = e;
+            logException(e, "io_error", "IO error during tag writing");
+            effectiveCallback.onError(activity.getString(R.string.erreur_lors_de_l_criture_du_tag_veuillez_r_essayer));
+            throw e;
+        } catch (FormatException e) {
+            operationException[0] = e;
+            logException(e, "format_error", "Format error during tag writing");
+            effectiveCallback.onError(activity.getString(R.string.format_de_tag_non_compatible));
+            throw e;
+        } catch (Exception e) {
+            operationException[0] = e;
+            logException(e, "unexpected_error", "Unexpected error during tag writing");
+            effectiveCallback.onError(activity.getString(R.string.erreur_inattendue_lors_de_l_criture_du_tag));
+            throw new IOException("Error writing to NFC tag", e);
+        } finally {
+            operationCompleted[0] = true;
+            handler.removeCallbacks(timeoutRunnable);
+        }
+    }
+
+    /**
+     * Version simplifiée de writeTag sans callback
+     */
+    public boolean writeTag(Tag tag, NdefMessage message, boolean makeReadOnly)
+            throws IOException, FormatException, NFCTagReadOnly, NFCTagCapacityExceeded, NFCOperationTimeout {
+        return writeTag(tag, message, makeReadOnly, null);
+    }
+
+    /**
+     * Ferme en toute sécurité une ressource NFC
+     * @param closeable L'objet à fermer (Ndef ou NdefFormatable)
+     */
+    private void safeClose(Object closeable) {
+        if (closeable == null) {
+            return;
+        }
+
+        try {
+            if (closeable instanceof Ndef) {
+                Ndef ndef = (Ndef) closeable;
+                if (ndef.isConnected()) {
+                    ndef.close();
+                }
+            } else if (closeable instanceof NdefFormatable) {
+                NdefFormatable formatable = (NdefFormatable) closeable;
+                formatable.close();
             }
         } catch (Exception e) {
-            if (!(e instanceof IOException || e instanceof FormatException ||
-                    e instanceof NFCTagReadOnly || e instanceof NFCTagCapacityExceeded)) {
-                crashlytics.recordException(e);
-                crashlytics.log("Exception non gérée dans writeTag: " + e.getMessage());
-
-                Bundle errorParams = new Bundle();
-                errorParams.putString("error_type", "unexpected_exception");
-                errorParams.putString("class", "NFCManager");
-                errorParams.putString("message", e.getMessage());
-                analytics.logEvent("writeTag_app_error", errorParams);
-
-                ToastManager.showError("Erreur lors de l'écriture du tag");
-            }
-            throw e;
+            logException(e, "close_error", "Error closing NFC resource");
+            // Ne pas lancer d'exception pour les erreurs de fermeture
         }
     }
 
@@ -514,44 +399,22 @@ public class NFCManager {
      * @return Message NDEF contenant l'URI
      */
     public NdefMessage createUriMessage(String content, String type) {
+        if (content == null || type == null) {
+            logError("Content or type is null", "null_parameters");
+            throw new IllegalArgumentException("Content and type cannot be null");
+        }
+
         try {
-            crashlytics.log("createUriMessage called");
-
-            if (content == null || type == null) {
-                crashlytics.log("Le contenu ou le type est null");
-                Log.e(TAG, "Le contenu et le type ne peuvent pas être nuls");
-
-                Bundle errorParams = new Bundle();
-                errorParams.putString("error_type", "null_content_or_type");
-                errorParams.putString("class", "NFCManager");
-                analytics.logEvent("createUriMessage_null_content_or_type", errorParams);
-
-                ToastManager.showError("Le contenu et le type ne peuvent pas être nuls");
-
-                throw new IllegalArgumentException("Le contenu et le type ne peuvent pas être nuls");
-            }
-
             crashlytics.setCustomKey("uriContent", content);
             crashlytics.setCustomKey("uriType", type);
 
             NdefRecord record = NdefRecord.createUri(type + content);
-            crashlytics.log("Message URI créé avec succès");
+            logInfo("URI message created successfully", "uri_created");
 
             return new NdefMessage(new NdefRecord[]{record});
         } catch (Exception e) {
-            crashlytics.recordException(e);
-            crashlytics.log("Erreur lors de la création du message URI: " + e.getMessage());
-            Log.e(TAG, "Erreur lors de la création du message URI: " + e.getMessage(), e);
-
-            Bundle errorParams = new Bundle();
-            errorParams.putString("error_type", "create_uri_exception");
-            errorParams.putString("class", "NFCManager");
-            errorParams.putString("message", e.getMessage());
-            analytics.logEvent("createUriMessage_app_error", errorParams);
-
-            ToastManager.showError("Erreur lors de la création du message URI");
-
-            throw new RuntimeException("Erreur lors de la création du message URI", e);
+            logException(e, "create_uri_error", "Error creating URI message");
+            throw new IllegalArgumentException("Error creating URI message", e);
         }
     }
 
@@ -561,32 +424,21 @@ public class NFCManager {
      * @return Message NDEF contenant le texte
      */
     public NdefMessage createTextMessage(String content) {
+        if (content == null) {
+            logError("Content is null", "null_content");
+            throw new IllegalArgumentException("Content cannot be null");
+        }
+
         try {
-            crashlytics.log("createTextMessage called");
-
-            if (content == null) {
-                crashlytics.log("Le contenu est null");
-                Log.e(TAG, "Le contenu ne peut pas être nul");
-
-                Bundle errorParams = new Bundle();
-                errorParams.putString("error_type", "null_content");
-                errorParams.putString("class", "NFCManager");
-                analytics.logEvent("createTextMessage_null_content", errorParams);
-
-                ToastManager.showError("Le contenu ne peut pas être nul");
-                throw new IllegalArgumentException("Le contenu ne peut pas être nul");
-            }
-
             crashlytics.setCustomKey("textContentLength", content.length());
+            logInfo("Creating text message, size: " + content.length() + " chars", "text_message");
 
-            // Get UTF-8 byte
+            // Obtenir les octets UTF-8
             byte[] lang = Locale.getDefault().getLanguage().getBytes(StandardCharsets.UTF_8);
-            byte[] text = content.getBytes(StandardCharsets.UTF_8); // Content in UTF-8
+            byte[] text = content.getBytes(StandardCharsets.UTF_8); // Contenu en UTF-8
 
             int langSize = lang.length;
             int textLength = text.length;
-
-            crashlytics.log("Création d'un message texte, taille: " + textLength + " octets");
 
             ByteArrayOutputStream payload = new ByteArrayOutputStream(1 + langSize + textLength);
             payload.write((byte) (langSize & 0x1F));
@@ -594,23 +446,11 @@ public class NFCManager {
             payload.write(text, 0, textLength);
             NdefRecord record = new NdefRecord(NdefRecord.TNF_WELL_KNOWN, NdefRecord.RTD_TEXT, new byte[0], payload.toByteArray());
 
-            crashlytics.log("Message texte créé avec succès");
-
+            logInfo("Text message created successfully", "text_created");
             return new NdefMessage(new NdefRecord[]{record});
         } catch (Exception e) {
-            crashlytics.recordException(e);
-            crashlytics.log("Erreur inattendue lors de la création du message texte: " + e.getMessage());
-            Log.e(TAG, "Erreur inattendue lors de la création du message texte: " + e.getMessage(), e);
-
-            Bundle errorParams = new Bundle();
-            errorParams.putString("error_type", "unexpected_exception");
-            errorParams.putString("class", "NFCManager");
-            errorParams.putString("message", e.getMessage());
-            analytics.logEvent("createTextMessage_app_error", errorParams);
-
-            ToastManager.showError("Erreur lors de la création du message texte");
-
-            throw new RuntimeException("Erreur lors de la création du message texte", e);
+            logException(e, "create_text_error", "Error creating text message");
+            throw new IllegalArgumentException("Error creating text message", e);
         }
     }
 
@@ -620,44 +460,29 @@ public class NFCManager {
      * @return Message NDEF externe
      */
     public NdefMessage createExternalMessage(String content) {
+        if (content == null) {
+            logError("Content is null", "null_content");
+            throw new IllegalArgumentException("Content cannot be null");
+        }
+
         try {
-            crashlytics.log("createExternalMessage called");
-
-            if (content == null) {
-                crashlytics.log("Le contenu est null");
-                Log.e(TAG, "Le contenu ne peut pas être nul");
-
-                Bundle errorParams = new Bundle();
-                errorParams.putString("error_type", "null_content");
-                errorParams.putString("class", "NFCManager");
-                analytics.logEvent("createExternalMessage_null_content", errorParams);
-
-                ToastManager.showError("Le contenu ne peut pas être nul");
-
-                throw new IllegalArgumentException("Le contenu ne peut pas être nul");
-            }
-
             crashlytics.setCustomKey("externalContentLength", content.length());
-            crashlytics.log("Création d'un message externe, taille: " + content.length() + " caractères");
+            logInfo("Creating external message, size: " + content.length() + " chars", "external_message");
 
-            NdefRecord externalRecord = NdefRecord.createExternal("fr.benysoftware", "data", content.getBytes(StandardCharsets.UTF_8));
-            crashlytics.log("Message externe créé avec succès");
+            // Utiliser le package de l'application pour éviter les conflits
+            String packageName = activity.getPackageName();
+
+            NdefRecord externalRecord = NdefRecord.createExternal(
+                    packageName, // Domaine - devrait correspondre au package de l'app
+                    "data",      // Type - identifie le format du contenu
+                    content.getBytes(StandardCharsets.UTF_8)
+            );
+
+            logInfo("External message created successfully", "external_created");
             return new NdefMessage(new NdefRecord[] { externalRecord });
         } catch (Exception e) {
-            crashlytics.recordException(e);
-            crashlytics.log("Erreur lors de la création du message externe: " + e.getMessage());
-
-            Log.e(TAG, "Erreur lors de la création du message externe: " + e.getMessage(), e);
-
-            Bundle errorParams = new Bundle();
-            errorParams.putString("error_type", "create_external_exception");
-            errorParams.putString("class", "NFCManager");
-            errorParams.putString("message", e.getMessage());
-            analytics.logEvent("createExternalMessage_app_error", errorParams);
-
-            ToastManager.showError("Erreur lors de la création du message externe");
-
-            throw new RuntimeException("Erreur lors de la création du message externe", e);
+            logException(e, "create_external_error", "Error creating external message");
+            throw new IllegalArgumentException("Error creating external message", e);
         }
     }
 
@@ -667,11 +492,88 @@ public class NFCManager {
      * @return Chaîne hexadécimale
      */
     private String bytesToHex(byte[] bytes) {
+        if (bytes == null) {
+            return "";
+        }
+
         StringBuilder sb = new StringBuilder();
         for (byte b : bytes) {
             sb.append(String.format("%02x", b));
         }
         return sb.toString();
+    }
+
+//********* LOGGING METHODS
+
+    private void logInfo(String message, String infoType) {
+        try {
+            crashlytics.log("INFO: " + message);
+            Log.i(TAG, message);
+
+            Bundle params = new Bundle();
+            params.putString("info_type", infoType);
+            params.putString("class", "NFCManager");
+            params.putString("info_message", message);
+            if (analytics != null) {
+                analytics.logEvent("app_info", params);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error in logInfo: " + e.getMessage());
+        }
+    }
+
+    private void logWarning(String message, String warningType) {
+        try {
+            crashlytics.log("WARNING: " + message);
+            Log.w(TAG, message);
+
+            Bundle params = new Bundle();
+            params.putString("warning_type", warningType);
+            params.putString("class", "NFCManager");
+            params.putString("warning_message", message);
+            if (analytics != null) {
+                analytics.logEvent("app_warning", params);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error in logWarning: " + e.getMessage());
+        }
+    }
+
+    private void logError(String message, String errorType) {
+        try {
+            crashlytics.log("ERROR: " + message);
+            Log.e(TAG, message);
+
+            Bundle params = new Bundle();
+            params.putString("error_type", errorType);
+            params.putString("class", "NFCManager");
+            params.putString("error_message", message);
+            if (analytics != null) {
+                analytics.logEvent("app_error", params);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error in logError: " + e.getMessage());
+        }
+    }
+
+    private void logException(Exception e, String errorType, String context) {
+        try {
+            crashlytics.recordException(e);
+            String errorMessage = e.getMessage() != null ? e.getMessage() : "No message";
+            crashlytics.log("EXCEPTION: " + context + ": " + errorMessage);
+            Log.e(TAG, context + ": " + errorMessage, e);
+
+            Bundle params = new Bundle();
+            params.putString("error_type", errorType);
+            params.putString("class", "NFCManager");
+            params.putString("error_message", errorMessage);
+            params.putString("error_context", context);
+            if (analytics != null) {
+                analytics.logEvent("app_exception", params);
+            }
+        } catch (Exception loggingEx) {
+            Log.e(TAG, "Error in logException: " + loggingEx.getMessage());
+        }
     }
 
 }

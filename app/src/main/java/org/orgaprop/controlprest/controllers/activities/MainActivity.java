@@ -107,7 +107,6 @@ public class MainActivity extends AppCompatActivity {
 
             // Vérifier les permissions essentielles avant de continuer
             checkPermissions();
-
         } catch (Exception e) {
             crashlytics.recordException(e);
             Log.e(TAG, "Erreur lors de l'initialisation de MainActivity", e);
@@ -118,7 +117,7 @@ public class MainActivity extends AppCompatActivity {
             errorParams.putString("error_message", e.getMessage());
             analytics.logEvent("onCreate_app_error", errorParams);
 
-            showErrorAndFinish(getString(R.string.erreur_lors_de_l_initialisation_de_l_application));
+            showErrorDialog(getString(R.string.erreur_lors_de_l_initialisation_de_l_application));
         }
     }
     @Override
@@ -126,10 +125,12 @@ public class MainActivity extends AppCompatActivity {
         super.onResume();
         try {
             crashlytics.log("onResume called");
+            Log.i(TAG, "onResume called");
+
             // Si les permissions sont OK et qu'une mise à jour n'est pas en cours
-            if (permissionsChecked.get() && !isCheckingUpdate.get() && !isStarted) {
-                checkUpdate();
-            }
+            //if (permissionsChecked.get() && !isCheckingUpdate.get() && !isStarted) {
+                //checkUpdate();
+            //}
         } catch (Exception e) {
             crashlytics.recordException(e);
             Log.e(TAG, "Erreur dans onResume", e);
@@ -204,7 +205,7 @@ public class MainActivity extends AppCompatActivity {
                             errorParams.putString("permission", "ACCESS_NETWORK_STATE");
                             analytics.logEvent("onPermissionResult_permission_error", errorParams);
 
-                            showErrorAndFinish(getString(R.string.mess_bad_permission_internet));
+                            showErrorDialog(getString(R.string.mess_bad_permission_internet));
                             return;
                         } else if (Manifest.permission.NFC.equals(permission)) {
                             Log.e(TAG, getString(R.string.mess_bad_nfc));
@@ -215,7 +216,7 @@ public class MainActivity extends AppCompatActivity {
                             errorParams.putString("permission", "NFC");
                             analytics.logEvent("onPermissionResult_permission_error", errorParams);
 
-                            showErrorAndFinish(getString(R.string.mess_bad_nfc));
+                            showErrorDialog(getString(R.string.mess_bad_nfc));
                             return;
                         }
                     }
@@ -236,7 +237,7 @@ public class MainActivity extends AppCompatActivity {
             errorParams.putString("error_message", e.getMessage());
             analytics.logEvent("onRequestPermissionsResult_app_error", errorParams);
 
-            showErrorAndFinish(getString(R.string.erreur_lors_de_la_v_rification_des_permissions));
+            showErrorDialog(getString(R.string.erreur_lors_de_la_v_rification_des_permissions));
         }
     }
 
@@ -304,6 +305,7 @@ public class MainActivity extends AppCompatActivity {
     private void checkPermissions() {
         try {
             crashlytics.log("checkPermissions called");
+            Log.i(TAG, "checkPermissions called");
 
             List<String> permissionsNeeded = new ArrayList<>();
 
@@ -340,7 +342,7 @@ public class MainActivity extends AppCompatActivity {
             errorParams.putString("error_message", e.getMessage());
             analytics.logEvent("checkPermissions_app_error", errorParams);
 
-            showErrorAndFinish(getString(R.string.erreur_lors_de_la_v_rification_des_permissions));
+            showErrorDialog(getString(R.string.erreur_lors_de_la_v_rification_des_permissions));
         }
     }
 
@@ -350,6 +352,20 @@ public class MainActivity extends AppCompatActivity {
     private void checkNfcAvailability() {
         try {
             crashlytics.log("checkNfcAvailability called");
+            Log.i(TAG, "checkNfcAvailability called");
+
+            if (BuildConfig.DEBUG) {
+                crashlytics.log("Mode DEBUG: vérification NFC ignorée");
+                Log.w(TAG, "Mode DEBUG: vérification NFC ignorée pour permettre les tests");
+
+                Bundle debugParams = new Bundle();
+                debugParams.putString("debug_action", "nfc_check_bypassed");
+                debugParams.putString("class", "MainActivity");
+                analytics.logEvent("debug_mode_action", debugParams);
+
+                checkUpdate();
+                return;
+            }
 
             NfcAdapter nfcAdapter = NfcAdapter.getDefaultAdapter(this);
 
@@ -363,7 +379,7 @@ public class MainActivity extends AppCompatActivity {
                 errorParams.putString("class", "MainActivity");
                 analytics.logEvent("checkNfcAvailability_no_nfc", errorParams);
 
-                showErrorDialog(getString(R.string.mess_bad_nfc), true);
+                showErrorDialog(getString(R.string.mess_bad_nfc));
                 return;
             }
 
@@ -400,7 +416,7 @@ public class MainActivity extends AppCompatActivity {
             errorParams.putString("error_message", e.getMessage());
             analytics.logEvent("checkNfcAvailability_app_error", errorParams);
 
-            showErrorDialog(getString(R.string.erreur_lors_de_la_v_rification_du_nfc), false);
+            showErrorDialog(getString(R.string.erreur_lors_de_la_v_rification_du_nfc));
         }
     }
 
@@ -429,7 +445,9 @@ public class MainActivity extends AppCompatActivity {
                             errorParams.putString("error_message", e.getMessage());
                             analytics.logEvent("showNfcEnableDialog_nfc_settings_error", errorParams);
 
-                            showErrorAndFinish("Impossible d'ouvrir les paramètres NFC");
+                            dialog.dismiss();
+
+                            showErrorDialog("Impossible d'ouvrir les paramètres NFC");
                         }
                     })
                     .setNegativeButton("Quitter", (dialog, which) -> finish());
@@ -445,7 +463,7 @@ public class MainActivity extends AppCompatActivity {
             errorParams.putString("error_message", e.getMessage());
             analytics.logEvent("showNfcEnableDialog_app_error", errorParams);
 
-            showErrorAndFinish(getString(R.string.mess_bad_nfc));
+            showErrorDialog(getString(R.string.mess_bad_nfc));
         }
     }
 
@@ -476,6 +494,23 @@ public class MainActivity extends AppCompatActivity {
     private void checkUpdate() {
         try {
             crashlytics.log("checkUpdate called");
+            Log.i(TAG, "checkUpdate called");
+
+            if (BuildConfig.DEBUG) {
+                crashlytics.log("Mode DEBUG: vérification NFC ignorée");
+                Log.w(TAG, "Mode DEBUG: vérification NFC ignorée pour permettre les tests");
+
+                Bundle debugParams = new Bundle();
+                debugParams.putString("debug_action", "nfc_check_bypassed");
+                debugParams.putString("class", "MainActivity");
+                analytics.logEvent("debug_mode_action", debugParams);
+
+                isCheckingUpdate.set(true);
+
+                mainHandler.postDelayed(this::startLoginActivity, AndyUtils.LAPS_TIME_TEST_CONNECT);
+
+                return;
+            }
 
             // Éviter les vérifications simultanées
             if (isCheckingUpdate.getAndSet(true)) {
@@ -490,13 +525,10 @@ public class MainActivity extends AppCompatActivity {
                 return;
             }
 
-            // Version sans risque - démarre toujours l'app après un délai
-            Runnable startAppRunnable = this::startLoginActivity;
-            mainHandler.postDelayed(startAppRunnable, SPLASH_SCREEN_DELAY);
-
             // Tenter la vérification de mise à jour en parallèle
             if (isFromPlayStore()) {
                 crashlytics.log("Application installée depuis Play Store");
+                Log.i(TAG, "Application installée depuis Play Store");
 
                 try {
                     // Initialiser le gestionnaire de mise à jour
@@ -505,6 +537,7 @@ public class MainActivity extends AppCompatActivity {
                     executorService.execute(() -> {
                         try {
                             crashlytics.log("Vérification de la connexion réseau");
+                            Log.i(TAG, "Vérification de la connexion réseau");
 
                             if (!AndyUtils.isNetworkAvailable(MainActivity.this)) {
                                 crashlytics.log("Pas de connexion réseau disponible");
@@ -515,10 +548,13 @@ public class MainActivity extends AppCompatActivity {
                                 errorParams.putString("class", "MainActivity");
                                 analytics.logEvent("checkUpdate_no_network", errorParams);
 
-                                return; // On sort simplement, startLoginActivity sera appelé par le handler
+                                showErrorDialog(getString(R.string.mess_conextion_lost));
+
+                                return;
                             }
 
                             crashlytics.log("Récupération des infos de mise à jour");
+                            Log.i(TAG, "Récupération des infos de mise à jour");
 
                             Task<AppUpdateInfo> appUpdateInfoTask = appUpdateManager.getAppUpdateInfo();
 
@@ -529,12 +565,25 @@ public class MainActivity extends AppCompatActivity {
                                     if (appUpdateInfo.updateAvailability() == UpdateAvailability.UPDATE_AVAILABLE &&
                                             appUpdateInfo.isUpdateTypeAllowed(AppUpdateType.IMMEDIATE)) {
                                         crashlytics.log("Mise à jour disponible et autorisée");
+                                        Log.i(TAG, "Mise à jour disponible et autorisée");
 
                                         // Annuler le démarrage automatique car on va lancer la mise à jour
                                         mainHandler.removeCallbacksAndMessages(null);
 
                                         // Démarrer la mise à jour
                                         startUpdateFlow(appUpdateInfo);
+                                    } else {
+                                        crashlytics.log("Mise à jour non disponible ou non autorisée");
+                                        Log.w(TAG, "Mise à jour non disponible ou non autorisée");
+
+                                        Bundle errorParams = new Bundle();
+                                        errorParams.putString("error_type", "update_not_available");
+                                        errorParams.putString("class", "MainActivity");
+                                        analytics.logEvent("checkUpdate_not_available", errorParams);
+
+                                        mainHandler.postDelayed(this::startLoginActivity, AndyUtils.LAPS_TIME_TEST_CONNECT);
+
+                                        isCheckingUpdate.set(true);
                                     }
                                     // Pour tous les autres cas, l'app démarrera normalement via le handler
                                 } catch (Exception e) {
@@ -546,6 +595,8 @@ public class MainActivity extends AppCompatActivity {
                                     errorParams.putString("class", "MainActivity");
                                     errorParams.putString("error_message", e.getMessage());
                                     analytics.logEvent("checkUpdate_app_error", errorParams);
+
+                                    showErrorDialog(getString(R.string.chec_de_la_v_rification_de_mise_jour));
 
                                     isCheckingUpdate.set(false);
                                 }
@@ -560,6 +611,8 @@ public class MainActivity extends AppCompatActivity {
                                 errorParams.putString("error_message", e.getMessage());
                                 analytics.logEvent("checkUpdate_app_error", errorParams);
 
+                                showErrorDialog(getString(R.string.chec_de_la_v_rification_de_mise_jour));
+
                                 isCheckingUpdate.set(false);
                             });
                         } catch (Exception e) {
@@ -571,6 +624,8 @@ public class MainActivity extends AppCompatActivity {
                             errorParams.putString("class", "MainActivity");
                             errorParams.putString("error_message", e.getMessage());
                             analytics.logEvent("checkUpdate_app_error", errorParams);
+
+                            showErrorDialog(getString(R.string.chec_de_la_v_rification_de_mise_jour));
 
                             isCheckingUpdate.set(false);
                         }
@@ -585,6 +640,8 @@ public class MainActivity extends AppCompatActivity {
                     errorParams.putString("error_message", e.getMessage());
                     analytics.logEvent("checkUpdate_app_error", errorParams);
 
+                    showErrorDialog(getString(R.string.chec_de_la_v_rification_de_mise_jour));
+
                     isCheckingUpdate.set(false);
                 }
             } else {
@@ -597,6 +654,10 @@ public class MainActivity extends AppCompatActivity {
                 analytics.logEvent("checkUpdate_not_from_play_store", errorParams);
 
                 isCheckingUpdate.set(false);
+
+                showErrorDialog(getString(R.string.chec_de_la_v_rification_de_mise_jour));
+
+                //mainHandler.postDelayed(this::startLoginActivity, SPLASH_SCREEN_DELAY);
             }
         } catch (Exception e) {
             crashlytics.recordException(e);
@@ -607,6 +668,8 @@ public class MainActivity extends AppCompatActivity {
             errorParams.putString("class", "MainActivity");
             errorParams.putString("error_message", e.getMessage());
             analytics.logEvent("checkUpdate_app_error", errorParams);
+
+            showErrorDialog(getString(R.string.chec_de_la_v_rification_de_mise_jour));
 
             isCheckingUpdate.set(false);
             mainHandler.removeCallbacksAndMessages(null);
@@ -620,6 +683,7 @@ public class MainActivity extends AppCompatActivity {
     private void startUpdateFlow(AppUpdateInfo updateInfo) {
         try {
             crashlytics.log("startUpdateFlow called");
+            Log.i(TAG, "startUpdateFlow called");
 
             isStarted = true;
 
@@ -643,7 +707,7 @@ public class MainActivity extends AppCompatActivity {
             analytics.logEvent("checkUpdate_app_error", errorParams);
 
             isCheckingUpdate.set(false);
-            mainHandler.postDelayed(this::startLoginActivity, SPLASH_SCREEN_DELAY);
+            //mainHandler.postDelayed(this::startLoginActivity, SPLASH_SCREEN_DELAY);
         }
     }
 
@@ -652,19 +716,9 @@ public class MainActivity extends AppCompatActivity {
      */
     private void startLoginActivity() {
         try {
-            if (isFinishing() || isDestroyed()) {
-                crashlytics.log("startLoginActivity: activité en cours de fermeture");
-                Log.w(TAG, "Tentative de démarrer LoginActivity alors que MainActivity est en train de se terminer");
-
-                Bundle errorParams = new Bundle();
-                errorParams.putString("error_type", "activity_closing");
-                errorParams.putString("class", "MainActivity");
-                analytics.logEvent("startLoginActivity_activity_closing", errorParams);
-
-                return;
-            }
-
             crashlytics.log("Démarrage de LoginActivity");
+            Log.i(TAG, "Démarrage de LoginActivity");
+
             Intent intent = new Intent(MainActivity.this, LoginActivity.class);
             startActivity(intent);
             finish();
@@ -678,7 +732,9 @@ public class MainActivity extends AppCompatActivity {
             errorParams.putString("error_message", e.getMessage());
             analytics.logEvent("startLoginActivity_app_error", errorParams);
 
-            showErrorAndFinish(getString(R.string.erreur_lors_du_d_marrage_de_l_application));
+            ToastManager.showError(getString(R.string.erreur_lors_du_d_marrage_de_l_application));
+
+            mainHandler.postDelayed(this::finish, SPLASH_SCREEN_DELAY);
         }
     }
 
@@ -688,13 +744,15 @@ public class MainActivity extends AppCompatActivity {
     private boolean isFromPlayStore() {
         try {
             crashlytics.log("isFromPlayStore called");
+            Log.i(TAG, "isFromPlayStore called");
 
             String installer = getPackageManager().getInstallerPackageName(getPackageName());
             boolean isFromStore = installer != null && installer.equals("com.android.vending");
 
             crashlytics.log("isFromPlayStore: " + isFromStore + ", installer: " + installer);
+            Log.i(TAG, "isFromPlayStore: " + isFromStore + ", installer: " + installer);
 
-            return isFromStore;
+            return isFromStore || BuildConfig.DEBUG;
         } catch (Exception e) {
             crashlytics.recordException(e);
             Log.e(TAG, "Erreur lors de la vérification de la source d'installation", e);
@@ -739,60 +797,18 @@ public class MainActivity extends AppCompatActivity {
     }
 
     /**
-     * Affiche une erreur et termine l'activité
-     */
-    private void showErrorAndFinish(String message) {
-        try {
-            crashlytics.log("showErrorAndFinish: " + message);
-            Log.e(TAG, "Erreur fatale: " + message);
-
-            Bundle errorParams = new Bundle();
-            errorParams.putString("error_type", "fatal_error");
-            errorParams.putString("class", "MainActivity");
-            errorParams.putString("error_message", message);
-            analytics.logEvent("showErrorAndFinish_app_error", errorParams);
-
-            ToastManager.showError(message);
-
-            mainHandler.postDelayed(this::startLoginActivity, SPLASH_SCREEN_DELAY);
-            finish();
-        } catch (Exception e) {
-            crashlytics.recordException(e);
-            Log.e(TAG, "Erreur lors de l'affichage du message d'erreur", e);
-
-            Bundle errorParams = new Bundle();
-            errorParams.putString("error_type", "error_message_error");
-            errorParams.putString("class", "MainActivity");
-            errorParams.putString("error_message", e.getMessage());
-            analytics.logEvent("showErrorAndFinish_app_error", errorParams);
-
-            ToastManager.showError(message);
-
-            mainHandler.postDelayed(this::startLoginActivity, SPLASH_SCREEN_DELAY);
-            finish();
-        }
-    }
-
-    /**
      * Affiche un dialogue d'erreur
      */
-    private void showErrorDialog(String message, boolean fatal) {
+    private void showErrorDialog(String message) {
         try {
-            crashlytics.log("showErrorDialog: " + message + ", fatal: " + fatal);
+            crashlytics.log("showErrorDialog: " + message);
+            Log.i(TAG, "showErrorDialog: " + message);
 
             AlertDialog.Builder builder = new AlertDialog.Builder(this);
             builder.setTitle("Erreur")
                     .setMessage(message)
-                    .setCancelable(false);
-
-            if (fatal) {
-                // Erreur fatale, l'application doit se terminer
-                builder.setPositiveButton("Fermer", (dialog, which) -> finish());
-            } else {
-                // Erreur non fatale, l'utilisateur peut continuer
-                builder.setPositiveButton("Continuer", (dialog, which) -> { checkUpdate(); })
-                        .setNegativeButton("Quitter", (dialog, which) -> finish());
-            }
+                    .setCancelable(false)
+                    .setPositiveButton("Fermer", (dialog, which) -> finish());
 
             myDialog = builder.create();
             myDialog.show();
@@ -808,12 +824,7 @@ public class MainActivity extends AppCompatActivity {
 
             ToastManager.showError(message);
 
-            if (fatal) {
-                mainHandler.postDelayed(this::startLoginActivity, SPLASH_SCREEN_DELAY);
-                finish();
-            } else {
-                checkUpdate();
-            }
+            mainHandler.postDelayed(this::finish, SPLASH_SCREEN_DELAY);
         }
     }
 

@@ -174,4 +174,6 @@
     <string name="loading_residences">Chargement des résidences : </string>
     <string name="showing_wait_indicator">Affichage de l\'indicateur d\'attente : </string>
     <string name="select_a_residence">Sélectioner une residence</string>
+    <string name="chec_de_la_v_rification_de_mise_jour">Échec de la vérification de mise à jour</string>
+    <string name="invalid_agency_index">Index de l\'agence non valide</string>
 </resources>

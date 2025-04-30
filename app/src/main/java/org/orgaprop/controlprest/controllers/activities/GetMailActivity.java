@@ -15,6 +15,7 @@ import android.view.inputmethod.InputMethodManager;
 import android.widget.EditText;
 
 import java.util.concurrent.CompletableFuture;
+import java.util.regex.Pattern;
 
 import com.google.firebase.analytics.FirebaseAnalytics;
 import com.google.firebase.crashlytics.FirebaseCrashlytics;
@@ -35,6 +36,10 @@ public class GetMailActivity extends AppCompatActivity {
     private boolean isRequestInProgress = false;
     private FirebaseCrashlytics crashlytics;
     private FirebaseAnalytics analytics;
+    private final Handler handler = new Handler(Looper.getMainLooper());
+    private static final int MESSAGE_DISPLAY_DELAY = 3500; // Longer delay for user to read messages
+    private static final String EMAIL_PATTERN = "[a-zA-Z0-9._-]+@[a-z]+\\.+[a-z]+";
+    private static final Pattern SPECIAL_CHARS_PATTERN = Pattern.compile("[<>\"'&]");
 
 //********* STATIC VARIABLES
 
@@ -58,6 +63,8 @@ public class GetMailActivity extends AppCompatActivity {
             crashlytics.setCustomKey("deviceManufacturer", Build.MANUFACTURER);
             crashlytics.log("GetMailActivity démarrée");
 
+            Log.i(TAG, "GetMailActivity démarrée");
+
             analytics = FirebaseAnalytics.getInstance(this);
 
             Bundle screenViewParams = new Bundle();
@@ -70,33 +77,19 @@ public class GetMailActivity extends AppCompatActivity {
 
             EditText mEditText = binding.getMailActivityMailTxt;
 
+            setupEditTextListeners(mEditText);
+
             Intent intent = getIntent();
 
             if (intent == null) {
-                crashlytics.log("Intent is null");
-                Log.e(TAG, "Intent is null");
-
-                Bundle errorParams = new Bundle();
-                errorParams.putString("error_type", "null_intent");
-                errorParams.putString("class", "GetMailActivity");
-                errorParams.putString("screen", "GetMailActivity");
-                analytics.logEvent("onCreate_intent", errorParams);
-
-                finish();
+                logError("Intent is null", "null_intent");
+                showErrorAndFinish(getString(R.string.erreur_lors_de_l_initialisation_de_l_application));
                 return;
             }
 
             typeRequete = intent.getStringExtra(GET_MAIL_ACTIVITY_TYPE);
             if (typeRequete == null) {
-                crashlytics.log("Type de requête est null, utilisation de valeur par défaut");
-                Log.e(TAG, "Type de requête est null");
-
-                Bundle reqTypeParams = new Bundle();
-                reqTypeParams.putString("issue", "null_request_type");
-                reqTypeParams.putString("class", "GetMailActivity");
-                reqTypeParams.putString("default_type", HttpTask.HTTP_TASK_CBL_MAIL);
-                analytics.logEvent("onCreate_type_requete", reqTypeParams);
-
+                logWarning("Request type is null, using default value", "null_request_type");
                 typeRequete = HttpTask.HTTP_TASK_CBL_MAIL;
             }
 
@@ -107,39 +100,12 @@ public class GetMailActivity extends AppCompatActivity {
             typeParams.putString("request_type", typeRequete);
             analytics.logEvent("onCreate_mail_request_type", typeParams);
 
-            mEditText.setOnEditorActionListener((textView, actionId, keyEvent) -> {
-                try {
-                    if (actionId == EditorInfo.IME_ACTION_DONE) {
-                        crashlytics.log("Action IME_ACTION_DONE déclenchée");
-
-                        Bundle keyboardParams = new Bundle();
-                        keyboardParams.putString("class", "GetMailActivity");
-                        keyboardParams.putString("action", "ime_done");
-                        analytics.logEvent("onCreate_keyboard_action", keyboardParams);
-
-                        if (mEditText.getText().length() > 0) {
-                            hideKeyboard();
-                            sendRequest();
-                        }
-                        return true;
-                    }
-                } catch (Exception e) {
-                    crashlytics.recordException(e);
-                    Log.e(TAG, "Exception dans onEditorActionListener: " + e.getMessage(), e);
-
-                    Bundle errorParams = new Bundle();
-                    errorParams.putString("error_type", "editor_action_exception");
-                    errorParams.putString("class", "GetMailActivity");
-                    errorParams.putString("error_message", e.getMessage());
-                    analytics.logEvent("onCreate_editor_listener", errorParams);
-
-                    String msg = getString(R.string.erreur_lors_de_l_envoi_de_la_demande);
-                    ToastManager.showError(msg);
-                }
-                return false;
-            });
+            if (!isValidRequestType(typeRequete)) {
+                logError("Invalid request type: " + typeRequete, "invalid_request_type");
+                showErrorAndFinish(getString(R.string.erreur_lors_de_l_initialisation_de_l_application));
+                return;
+            }
         } catch (Exception e) {
-            FirebaseCrashlytics.getInstance();
             FirebaseCrashlytics.getInstance().recordException(e);
 
             try {
@@ -155,23 +121,44 @@ public class GetMailActivity extends AppCompatActivity {
         }
     }
 
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        try {
+            // Clean up resources
+            handler.removeCallbacksAndMessages(null);
+        } catch (Exception e) {
+            Log.e(TAG, "Error in onDestroy: " + e.getMessage(), e);
+        }
+    }
+
 //********* PUBLIC FUNCTIONS
 
     public void getMailActivityActions(View v) {
         try {
             crashlytics.log("getMailActivityActions appelée");
+            Log.i(TAG, "getMailActivityActions appelée");
+
+            if (!isActivityValid()) {
+                logWarning("Activity state invalid when handling action", "invalid_activity_state");
+                return;
+            }
+
+            if (v == null || v.getTag() == null) {
+                logWarning("View or tag is null", "null_view_or_tag");
+                return;
+            }
+
+            String tag = v.getTag().toString();
+            if (!"send".equals(tag)) {
+                logWarning("Unknown view tag: " + tag, "unknown_tag");
+                return;
+            }
 
             hideKeyboard();
             sendRequest();
         } catch (Exception e) {
-            crashlytics.recordException(e);
-            Log.e(TAG, "Exception dans getMailActivityActions: " + e.getMessage(), e);
-
-            Bundle errorParams = new Bundle();
-            errorParams.putString("error_type", "action_exception");
-            errorParams.putString("class", "GetMailActivity");
-            errorParams.putString("error_message", e.getMessage());
-            analytics.logEvent("getMailActivityActions_error", errorParams);
+            logException(e, "action_exception", "Exception dans getMailActivityActions");
 
             String msg = getString(R.string.erreur_lors_de_l_envoi_de_la_demande);
             ToastManager.showError(msg);
@@ -180,6 +167,67 @@ public class GetMailActivity extends AppCompatActivity {
 
 //********* PRIVATE FUNCTIONS
 
+    /**
+     * Configure les listeners pour l'EditText
+     */
+    private void setupEditTextListeners(EditText editText) {
+        try {
+            editText.setOnEditorActionListener((textView, actionId, keyEvent) -> {
+                try {
+                    if (actionId == EditorInfo.IME_ACTION_DONE || actionId == EditorInfo.IME_ACTION_SEND) {
+                        crashlytics.log("Action IME_ACTION déclenché: " + actionId);
+                        Log.d(TAG, "Action clavier détectée: " + actionId);
+
+                        Bundle keyboardParams = new Bundle();
+                        keyboardParams.putString("class", "GetMailActivity");
+                        keyboardParams.putString("action", "ime_action");
+                        keyboardParams.putInt("action_id", actionId);
+                        analytics.logEvent("keyboard_action", keyboardParams);
+
+                        if (editText.getText().length() > 0) {
+                            hideKeyboard();
+                            sendRequest();
+                        }
+                        return true;
+                    }
+                } catch (Exception e) {
+                    logException(e, "editor_action_exception", "Exception dans onEditorActionListener");
+                    // Même en cas d'erreur, on continue le traitement normal
+                }
+                return false;
+            });
+
+            editText.setOnFocusChangeListener((v, hasFocus) -> {
+                try {
+                    if (hasFocus) {
+                        final InputMethodManager imm = (InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
+                        if (imm != null) {
+                            imm.showSoftInput(editText, InputMethodManager.SHOW_IMPLICIT);
+                        }
+                    }
+                } catch (Exception e) {
+                    logException(e, "focus_change_exception", "Exception dans onFocusChangeListener");
+                }
+            });
+        } catch (Exception e) {
+            logException(e, "setup_listeners_exception", "Exception lors de la configuration des listeners");
+        }
+    }
+
+    /**
+     * Vérifie si le type de requête est valide
+     */
+    private boolean isValidRequestType(String type) {
+        return HttpTask.HTTP_TASK_CBL_MAIL.equals(type) || HttpTask.HTTP_TASK_CBL_ROBOT.equals(type);
+    }
+
+    /**
+     * Vérifie si l'activité est dans un état valide pour traiter des actions
+     */
+    private boolean isActivityValid() {
+        return !isFinishing() && !isDestroyed();
+    }
+
     private void hideKeyboard() {
         try {
             crashlytics.log("hideKeyboard appelée");
@@ -187,33 +235,47 @@ public class GetMailActivity extends AppCompatActivity {
             InputMethodManager imm = (InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
             if (imm != null && getCurrentFocus() != null) {
                 imm.hideSoftInputFromWindow(getCurrentFocus().getWindowToken(), 0);
+                Log.d(TAG, "Clavier masqué avec succès");
+            } else {
+                Log.d(TAG, "Impossible de masquer le clavier - focus ou IMM null");
             }
         } catch (Exception e) {
-            crashlytics.recordException(e);
-            Log.e(TAG, "Exception dans hideKeyboard: " + e.getMessage(), e);
-
-            Bundle errorParams = new Bundle();
-            errorParams.putString("error_type", "keyboard_exception");
-            errorParams.putString("class", "GetMailActivity");
-            errorParams.putString("error_message", e.getMessage());
-            analytics.logEvent("hideKeyboard_error", errorParams);
-
-            String msg = getString(R.string.erreur_lors_de_l_envoi_de_la_demande);
-            ToastManager.showError(msg);
+            logException(e, "keyboard_exception", "Exception dans hideKeyboard");
         }
     }
 
+    /**
+     * Valide l'email avec des règles plus strictes
+     */
     private boolean isValidEmail(String email) {
-        return Patterns.EMAIL_ADDRESS.matcher(email).matches();
+        if (email == null || email.isEmpty()) {
+            return false;
+        }
+
+        // Vérification standard du format de l'email
+        boolean isValidFormat = Patterns.EMAIL_ADDRESS.matcher(email).matches();
+
+        // Vérification supplémentaire contre les injections
+        boolean containsSpecialChars = SPECIAL_CHARS_PATTERN.matcher(email).find();
+
+        return isValidFormat && !containsSpecialChars;
     }
 
+    /**
+     * Envoie la requête au serveur après validation
+     */
     private void sendRequest() {
         try {
             crashlytics.log("sendRequest appelée");
 
             if (isRequestInProgress) {
-                crashlytics.log("Une requête est déjà en cours");
-                Log.d(TAG, "Une requête est déjà en cours");
+                logWarning("Une requête est déjà en cours", "request_in_progress");
+                ToastManager.showShort(getString(R.string.une_op_ration_est_d_j_en_cours));
+                return;
+            }
+
+            if (!isActivityValid()) {
+                logWarning("Activity invalide lors de sendRequest", "invalid_activity_state");
                 return;
             }
 
@@ -221,53 +283,27 @@ public class GetMailActivity extends AppCompatActivity {
             String email = mEditText.getText().toString().trim();
 
             if (email.isEmpty()) {
-                crashlytics.log("exception dans sendRequest: email empty");
-                Log.d(TAG, "exception dans sendRequest: email empty");
-
-                Bundle errorParams = new Bundle();
-                errorParams.putString("error_type", "empty_email");
-                errorParams.putString("class", "GetMailActivity");
-                errorParams.putString("method", "sendRequest");
-                analytics.logEvent("sendRequest_email_empty", errorParams);
-
-                String msg = getString(R.string.veuillez_entrer_une_adresse_email);
-                ToastManager.showError(msg);
+                logWarning("Email vide", "empty_email");
+                ToastManager.showError(getString(R.string.veuillez_entrer_une_adresse_email));
                 return;
             }
 
             if (!isValidEmail(email)) {
-                crashlytics.log("exception dans sendRequest: email not valid ("+email+")");
-                Log.d(TAG, "exception dans sendRequest: email not valid");
-
-                Bundle errorParams = new Bundle();
-                errorParams.putString("error_type", "invalid_email");
-                errorParams.putString("class", "GetMailActivity");
-                analytics.logEvent("sendRequest_email_invalid", errorParams);
-
-                String msg = getString(R.string.veuillez_entrer_une_adresse_email_valide);
-                ToastManager.showError(msg);
+                logWarning("Email invalide: " + email, "invalid_email");
+                ToastManager.showError(getString(R.string.veuillez_entrer_une_adresse_email_valide));
                 return;
             }
 
-            crashlytics.setCustomKey("emailLength", email.length());
-
-            if (!AndyUtils.isNetworkAvailable(this)) {
-                crashlytics.log("exception dans sendRequest: no network");
-                Log.d(TAG, "exception dans sendRequest: no network");
-
-                Bundle errorParams = new Bundle();
-                errorParams.putString("error_type", "no_network");
-                errorParams.putString("class", "GetMailActivity");
-                analytics.logEvent("SendRequest_no_network", errorParams);
-
-                String msg = getString(R.string.mess_conextion_lost);
-                ToastManager.showError(msg);
+            // Vérification du réseau
+            if (!AndyUtils.isNetworkAvailable(getApplicationContext())) {
+                logWarning("Pas de connexion réseau", "no_network");
+                ToastManager.showError(getString(R.string.mess_conextion_lost));
                 return;
             }
 
             isRequestInProgress = true;
-
             crashlytics.log("Préparation de la requête HTTP");
+            Log.d(TAG, "Envoi d'une requête pour l'email: " + email);
 
             String mail = "mail=" + mEditText.getText().toString();
             String cbl = (typeRequete.equals(HttpTask.HTTP_TASK_CBL_ROBOT)) ? HttpTask.HTTP_TASK_CBL_ROBOT : HttpTask.HTTP_TASK_CBL_MAIL;
@@ -282,120 +318,155 @@ public class GetMailActivity extends AppCompatActivity {
                 runOnUiThread(() -> {
                     try {
                         isRequestInProgress = false;
-                        crashlytics.log("Réponse reçue");
+                        crashlytics.log("Réponse reçue: " + (result != null ? result.substring(0, Math.min(50, result != null ? result.length() : 0)) + "..." : "null"));
+                        Log.d(TAG, "Réponse du serveur reçue");
 
                         if (result == null) {
-                            crashlytics.log("result null");
-                            Log.d(TAG, "exception dans sendRequest: result null");
-
-                            Bundle errorParams = new Bundle();
-                            errorParams.putString("error_type", "null_result");
-                            errorParams.putString("class", "GetMailActivity");
-                            analytics.logEvent("SendRequest_null_result", errorParams);
-
-                            String msg = getString(R.string.erreur_de_communication_avec_le_serveur);
-                            ToastManager.showError(msg);
+                            logError("Résultat null", "null_result");
+                            showErrorAndFinish(getString(R.string.erreur_de_communication_avec_le_serveur));
                             return;
                         }
 
-                        if( result.startsWith("0") ) {
-                            crashlytics.log("Échec: " + (result.length() > 1 ? result.substring(1) : "inconnu"));
-                            Log.d(TAG, "exception dans sendRequest: result error");
-
-                            Bundle errorParams = new Bundle();
-                            errorParams.putString("error_type", "error_result");
-                            errorParams.putString("class", "GetMailActivity");
-                            analytics.logEvent("SendRequest_error_result", errorParams);
-
-                            String msg = result.substring(1);
-                            ToastManager.showError(msg);
-
-                            setResult(RESULT_CANCELED);
-                        } else {
-                            crashlytics.log("Succès: Email envoyé à " + email);
-                            Log.d(TAG, "exception dans sendRequest: result success");
-
-                            Bundle errorParams = new Bundle();
-                            errorParams.putString("error_type", "success_result");
-                            errorParams.putString("class", "GetMailActivity");
-                            analytics.logEvent("sendRequest_success", errorParams);
-
-                            String msg = getString(R.string.un_message_a_t_envoy) + " à "  + email;
-                            ToastManager.showShort(msg);
-
-                            setResult(RESULT_OK);
+                        if (result.isEmpty()) {
+                            logError("Résultat vide", "empty_result");
+                            showErrorAndFinish(getString(R.string.erreur_de_communication_avec_le_serveur));
+                            return;
                         }
 
-                        new Handler(Looper.getMainLooper()).postDelayed(this::finish, 2000);
+                        if (result.startsWith("0")) {
+                            String errorMessage = result.length() > 1 ? result.substring(1) : getString(R.string.erreur_lors_du_traitement_de_la_r_ponse);
+                            logError("Échec: " + errorMessage, "error_result");
+                            ToastManager.showError(errorMessage);
+                            setResult(RESULT_CANCELED);
+                        } else if (result.startsWith("1")) {
+                            logInfo("Succès: Email envoyé à " + email, "success_result");
+                            String msg = getString(R.string.un_message_a_t_envoy) + " à " + email;
+                            ToastManager.showShort(msg);
+                            setResult(RESULT_OK);
+                        } else {
+                            logError("Format de réponse inattendu: " + result, "unexpected_format");
+                            ToastManager.showError(getString(R.string.erreur_lors_du_traitement_de_la_r_ponse));
+                            setResult(RESULT_CANCELED);
+                        }
+
+                        finishWithDelay();
                     } catch (Exception e) {
-                        crashlytics.recordException(e);
-                        Log.e(TAG, "Exception dans le traitement du résultat: " + e.getMessage(), e);
-
-                        Bundle errorParams = new Bundle();
-                        errorParams.putString("error_type", "result_processing_exception");
-                        errorParams.putString("class", "GetMailActivity");
-                        errorParams.putString("error_message", e.getMessage());
-                        analytics.logEvent("sendRequest_result_processing", errorParams);
-
-                        String msg = getString(R.string.erreur_lors_du_traitement_de_la_r_ponse);
-                        ToastManager.showError(msg);
-
-                        setResult(RESULT_CANCELED);
-                        finish();
+                        isRequestInProgress = false;
+                        logException(e, "result_processing_exception", "Exception dans le traitement du résultat");
+                        showErrorAndFinish(getString(R.string.erreur_lors_du_traitement_de_la_r_ponse));
                     }
                 });
             }).exceptionally(ex -> {
                 runOnUiThread(() -> {
-                    String msg = getString(R.string.erreur_de_communication_avec_le_serveur);
-
-                    try {
-                        isRequestInProgress = false;
-                        crashlytics.recordException(ex);
-                        crashlytics.log("Exception dans la requête HTTP");
-                        Log.e(TAG, "Exception dans sendRequest: " + ex.getMessage(), ex);
-
-                        Bundle errorParams = new Bundle();
-                        errorParams.putString("error_type", "http_request_exception");
-                        errorParams.putString("class", "GetMailActivity");
-                        errorParams.putString("error_message", ex.getMessage());
-                        analytics.logEvent("sendRequest_http_request", errorParams);
-
-                        ToastManager.showError(msg);
-
-                        setResult(RESULT_CANCELED);
-                        new Handler(Looper.getMainLooper()).postDelayed(this::finish, 2000);
-                    } catch (Exception e) {
-                        if (crashlytics != null) {
-                            crashlytics.recordException(e);
-                        }
-                        Log.e(TAG, "Exception dans exceptionally: " + e.getMessage(), e);
-
-                        Bundle errorParams = new Bundle();
-                        errorParams.putString("error_type", "exceptionally_exception");
-                        errorParams.putString("class", "GetMailActivity");
-                        errorParams.putString("error_message", e.getMessage());
-                        analytics.logEvent("sendRequest_exceptionally", errorParams);
-
-                        finish();
-                    }
+                    isRequestInProgress = false;
+                    logException((Exception) ex, "http_request_exception", "Exception dans la requête HTTP");
+                    showErrorAndFinish(getString(R.string.erreur_de_communication_avec_le_serveur));
                 });
-
                 return null;
             });
         } catch (Exception e) {
             isRequestInProgress = false;
+            logException(e, "send_request_exception", "Exception dans sendRequest");
+            ToastManager.showError(getString(R.string.erreur_lors_de_l_envoi_de_la_demande));
+        }
+    }
 
+    /**
+     * Termine l'activité après un délai
+     */
+    private void finishWithDelay() {
+        try {
+            // Using a longer delay to ensure the user can read the message
+            handler.postDelayed(this::finish, MESSAGE_DISPLAY_DELAY);
+        } catch (Exception e) {
+            logException(e, "finish_delay_exception", "Exception lors de la fermeture avec délai");
+            finish(); // Fallback to immediate finish
+        }
+    }
+
+    /**
+     * Affiche une erreur et termine l'activité
+     */
+    private void showErrorAndFinish(String message) {
+        try {
+            ToastManager.showError(message);
+            finishWithDelay();
+        } catch (Exception e) {
+            logException(e, "show_error_finish_exception", "Exception lors de l'affichage de l'erreur");
+            finish();
+        }
+    }
+
+    //********* LOGGING METHODS
+
+    private void logInfo(String message, String errorType) {
+        try {
+            crashlytics.log("INFO: " + message);
+            Log.i(TAG, message);
+
+            Bundle params = new Bundle();
+            params.putString("info_type", errorType);
+            params.putString("class", "GetMailActivity");
+            params.putString("info_message", message);
+            if (analytics != null) {
+                analytics.logEvent("app_info", params);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error in logInfo: " + e.getMessage());
+        }
+    }
+
+    private void logWarning(String message, String errorType) {
+        try {
+            crashlytics.log("WARNING: " + message);
+            Log.w(TAG, message);
+
+            Bundle params = new Bundle();
+            params.putString("warning_type", errorType);
+            params.putString("class", "GetMailActivity");
+            params.putString("warning_message", message);
+            if (analytics != null) {
+                analytics.logEvent("app_warning", params);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error in logWarning: " + e.getMessage());
+        }
+    }
+
+    private void logError(String message, String errorType) {
+        try {
+            crashlytics.log("ERROR: " + message);
+            Log.e(TAG, message);
+
+            Bundle params = new Bundle();
+            params.putString("error_type", errorType);
+            params.putString("class", "GetMailActivity");
+            params.putString("error_message", message);
+            if (analytics != null) {
+                analytics.logEvent("app_error", params);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error in logError: " + e.getMessage());
+        }
+    }
+
+    private void logException(Exception e, String errorType, String context) {
+        try {
             crashlytics.recordException(e);
-            Log.e(TAG, "Exception dans sendRequest: " + e.getMessage(), e);
+            String errorMessage = e.getMessage() != null ? e.getMessage() : "No message";
+            crashlytics.log("EXCEPTION: " + context + ": " + errorMessage);
+            Log.e(TAG, context + ": " + errorMessage, e);
 
-            Bundle errorParams = new Bundle();
-            errorParams.putString("error_type", "send_request_exception");
-            errorParams.putString("class", "GetMailActivity");
-            errorParams.putString("error_message", e.getMessage());
-            analytics.logEvent("sendRequest_exception", errorParams);
-
-            String msg = getString(R.string.erreur_lors_de_l_envoi_de_la_demande);
-            ToastManager.showError(msg);
+            Bundle params = new Bundle();
+            params.putString("error_type", errorType);
+            params.putString("class", "GetMailActivity");
+            params.putString("error_message", errorMessage);
+            params.putString("error_context", context);
+            if (analytics != null) {
+                analytics.logEvent("app_exception", params);
+            }
+        } catch (Exception loggingEx) {
+            Log.e(TAG, "Error in logException: " + loggingEx.getMessage());
         }
     }
 

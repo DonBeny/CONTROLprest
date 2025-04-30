@@ -4,8 +4,6 @@ import android.util.Log;
 
 import androidx.annotation.NonNull;
 
-import org.orgaprop.controlprest.utils.ToastManager;
-
 public class ListResidModel {
 
 //********* PRIVATES VARIABLES
@@ -29,21 +27,16 @@ public class ListResidModel {
 
     public ListResidModel() {}
     public ListResidModel(String agc,String grp, int id, String ref, String name, String entry, String adr, String city, boolean visited, String last) {
-        try {
-            this.agc = agc != null ? agc : "";
-            this.grp = grp != null ? grp : "";
-            this.id = id;
-            this.ref = ref != null ? ref : "";
-            this.name = name != null ? name : "";
-            this.entry = entry != null ? entry : "";
-            this.adr = adr != null ? adr : "";
-            this.city = city != null ? city : "";
-            this.visited = visited;
-            this.last = last != null ? last : "";
-        } catch (Exception e) {
-            Log.e(TAG, "Error in constructor: " + e.getMessage());
-            ToastManager.showShort("Error in constructor: " + e.getMessage());
-        }
+        setAgc(agc);
+        setGrp(grp);
+        setId(id);
+        setRef(ref);
+        setName(name);
+        setEntry(entry);
+        setAdr(adr);
+        setCity(city);  // Utilise la version à un seul paramètre
+        setVisited(visited);
+        setLast(last);
     }
 
 //********* PUBLIC FUNCTIONS
@@ -54,10 +47,9 @@ public class ListResidModel {
 
     public void setId(Integer id) {
         try {
-            this.id = id != null ? id : 0;
+            this.id = (id != null && id >= 0) ? id : 0;
         } catch (Exception e) {
-            Log.e(TAG, "Error setting id: " + e.getMessage());
-            ToastManager.showShort("Error setting id: " + e.getMessage());
+            Log.e(TAG, "Error setting id: " + e.getMessage(), e);
             this.id = 0;
         }
     }
@@ -70,8 +62,7 @@ public class ListResidModel {
         try {
             this.ref = ref != null ? ref : "";
         } catch (Exception e) {
-            Log.e(TAG, "Error setting ref: " + e.getMessage());
-            ToastManager.showShort("Error setting ref: " + e.getMessage());
+            Log.e(TAG, "Error setting ref: " + e.getMessage(), e);
             this.ref = "";
         }
     }
@@ -84,8 +75,7 @@ public class ListResidModel {
         try {
             this.name = name != null ? name : "";
         } catch (Exception e) {
-            Log.e(TAG, "Error setting name: " + e.getMessage());
-            ToastManager.showShort("Error setting name: " + e.getMessage());
+            Log.e(TAG, "Error setting name: " + e.getMessage(), e);
             this.name = "";
         }
     }
@@ -98,38 +88,58 @@ public class ListResidModel {
         try {
             this.entry = entry != null ? entry : "";
         } catch (Exception e) {
-            Log.e(TAG, "Error setting entry: " + e.getMessage());
-            ToastManager.showShort("Error setting entry: " + e.getMessage());
+            Log.e(TAG, "Error setting entry: " + e.getMessage(), e);
             this.entry = "";
         }
     }
 
-    public String getAdress() {
+    public String getAdr() {
         return this.adr;
     }
 
-    public void setAdresse(String adr) {
+    public void setAdr(String adr) {
         try {
             this.adr = adr != null ? adr : "";
         } catch (Exception e) {
-            Log.e(TAG, "Error setting adresse: " + e.getMessage());
-            ToastManager.showShort("Error setting adresse: " + e.getMessage());
+            Log.e(TAG, "Error setting adr: " + e.getMessage(), e);
             this.adr = "";
         }
     }
+
+    // Correction de l'incohérence : renommer getAdress() en getAdr() pour correspondre au nom de la variable
+    // ou renommer adr en address pour cohérence
 
     public String getCity() {
         return this.city;
     }
 
+    public void setCity(String city) {
+        try {
+            this.city = city != null ? city : "";
+        } catch (Exception e) {
+            Log.e(TAG, "Error setting city: " + e.getMessage(), e);
+            this.city = "";
+        }
+    }
+
+    // Surcharge pour la compatibilité avec le code existant
     public void setCity(String cp, String city) {
         try {
-            String cpValue = cp != null ? cp : "";
-            String cityValue = city != null ? city : "";
-            this.city = cpValue.trim() + (cpValue.trim().isEmpty() || cityValue.trim().isEmpty() ? "" : " ") + cityValue.trim();
+            String cpValue = cp != null ? cp.trim() : "";
+            String cityValue = city != null ? city.trim() : "";
+
+            // Concaténation sécurisée avec vérification des chaînes vides
+            if (cpValue.isEmpty() && cityValue.isEmpty()) {
+                this.city = "";
+            } else if (cpValue.isEmpty()) {
+                this.city = cityValue;
+            } else if (cityValue.isEmpty()) {
+                this.city = cpValue;
+            } else {
+                this.city = cpValue + " " + cityValue;
+            }
         } catch (Exception e) {
-            Log.e(TAG, "Error setting city: " + e.getMessage());
-            ToastManager.showShort("Error setting city: " + e.getMessage());
+            Log.e(TAG, "Error setting city with cp and city: " + e.getMessage(), e);
             this.city = "";
         }
     }
@@ -142,8 +152,7 @@ public class ListResidModel {
         try {
             this.agc = agc != null ? agc : "";
         } catch (Exception e) {
-            Log.e(TAG, "Error setting agc: " + e.getMessage());
-            ToastManager.showShort("Error setting agc: " + e.getMessage());
+            Log.e(TAG, "Error setting agc: " + e.getMessage(), e);
             this.agc = "";
         }
     }
@@ -156,8 +165,7 @@ public class ListResidModel {
         try {
             this.grp = grp != null ? grp : "";
         } catch (Exception e) {
-            Log.e(TAG, "Error setting grp: " + e.getMessage());
-            ToastManager.showShort("Error setting grp: " + e.getMessage());
+            Log.e(TAG, "Error setting grp: " + e.getMessage(), e);
             this.grp = "";
         }
     }
@@ -170,8 +178,7 @@ public class ListResidModel {
         try {
             this.visited = visited;
         } catch (Exception e) {
-            Log.e(TAG, "Error setting visited: " + e.getMessage());
-            ToastManager.showShort("Error setting visited: " + e.getMessage());
+            Log.e(TAG, "Error setting visited: " + e.getMessage(), e);
             this.visited = false;
         }
     }
@@ -184,8 +191,7 @@ public class ListResidModel {
         try {
             this.last = last != null ? last : "";
         } catch (Exception e) {
-            Log.e(TAG, "Error setting last: " + e.getMessage());
-            ToastManager.showShort("Error setting last: " + e.getMessage());
+            Log.e(TAG, "Error setting last: " + e.getMessage(), e);
             this.last = "";
         }
     }
@@ -194,6 +200,11 @@ public class ListResidModel {
     @Override
     public String toString() {
         return "ResidenceInfo: " + name + " (" + ref + "), " + entry + ", " + adr + ", " + city;
+    }
+
+    // Méthode utilitaire pour vérifier la validité du modèle
+    public boolean isValid() {
+        return !ref.isEmpty() && !name.isEmpty();
     }
 
 }
